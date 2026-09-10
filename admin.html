@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="uz" class="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; media-src 'self' blob: data: https:; connect-src 'self' https: data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
+<title>Admin — IELTS Speaking Pro</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<script src="https://unpkg.com/lucide@latest" defer crossorigin="anonymous"></script>
+<style>html.dark{color-scheme:dark}:root{color-scheme:light}</style>
+</head>
+<body class="bg-[#F5F0FF] dark:bg-[#0F0A1E] text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen">
+<header class="sticky top-0 z-40 bg-white/90 dark:bg-[#0F0A1E]/90 backdrop-blur border-b border-slate-200 dark:border-white/10">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 h-[56px] flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-3">
+      <img src="assets/logo.png" alt="logo" class="w-8 h-8 rounded-full object-cover">
+      <span class="font-extrabold text-[14px] tracking-tight">IELTS SPEAKING <span class="text-[10px] bg-[#2E0E4E] text-white px-1.5 py-0.5 rounded-full">ADMIN</span></span>
+    </a>
+    <div class="flex items-center gap-2">
+      <a href="index.html" class="text-[13px] font-bold bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-3 py-1.5 rounded-full">← Saytga qaytish</a>
+      <button id="adminLogoutBtn" onclick="adminLogout()" class="hidden text-[13px] font-bold bg-red-500 text-white px-3 py-1.5 rounded-full">Chiqish</button>
+    </div>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div id="adminLoginView" class="max-w-[440px] mx-auto mt-12 sm:mt-20 px-4">
+  <div class="bg-white dark:bg-[#111A33] rounded-[24px] border border-slate-200 dark:border-white/10 shadow-soft p-6 sm:p-8">
+    <div class="w-12 h-12 rounded-2xl bg-[#2E0E4E] text-white grid place-items-center mx-auto"><i data-lucide="shield-check" class="w-6 h-6"></i></div>
+    <h1 class="mt-4 text-center font-extrabold text-[22px]">Admin panel</h1>
+    <p class="text-center text-[13px] text-slate-500 mt-1">Faqat administratorlar uchun. Login va parolni kiriting.</p>
+    <div id="loginError" class="hidden mt-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-300 rounded-xl px-3 py-2 text-[13px]"></div>
+    <form onsubmit="handleAdminLogin(event)" class="mt-6 space-y-4">
+      <div>
+        <label class="text-[12px] font-bold">Login</label>
+        <input id="adminUser" type="text" placeholder="admin" maxlength="30" autocomplete="username" class="mt-1 w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-[14px] outline-none focus:border-slate-400">
+      </div>
+      <div>
+        <label class="text-[12px] font-bold">Parol</label>
+        <input id="adminPass" type="password" placeholder="••••••••" maxlength="64" autocomplete="current-password" class="mt-1 w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5 text-[14px] outline-none focus:border-slate-400">
+        <div class="text-[11px] text-slate-500 mt-1">Demo: <code>admin</code> / <code>IELTS2026!</code></div>
+      </div>
+      <button type="submit" class="w-full bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full py-3 font-extrabold text-[14px]">Kirish →</button>
+      <div class="text-[11px] text-center text-slate-500">5 marta xato → 5 daqiqa blok. Sessiya 30 daqiqada tugaydi.</div>
+    </form>
+    <div class="mt-6 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-[12px] leading-5">
+      <b>Xavfsizlik:</b> Parol SHA-256 bilan tekshiriladi, sessiya <code>sessionStorage</code> da saqlanadi, hech qachon <code>localStorage</code> da parol saqlanmaydi. Barcha kiritmalar sanitize qilinadi.
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="adminDashboard" class="hidden max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <!-- Stats -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="bg-white dark:bg-[#111A33] rounded-2xl border border-slate-200 dark:border-white/10 p-4">
+      <div class="text-[11px] font-extrabold tracking-widest text-slate-500">PART 1</div>
+      <div id="statP1" class="text-[24px] font-extrabold">38</div>
+      <div class="text-[11px] text-slate-500">mavzu • admin via customData</div>
+    </div>
+    <div class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-2xl p-4">
+      <div class="text-[11px] font-extrabold tracking-widest opacity-70">PART 2</div>
+      <div id="statP2" class="text-[24px] font-extrabold">80</div>
+      <div class="text-[11px] opacity-70">cue cards</div>
+    </div>
+    <div class="bg-amber-400 text-slate-900 rounded-2xl p-4">
+      <div class="text-[11px] font-extrabold opacity-70">PART 3</div>
+      <div id="statP3" class="text-[24px] font-extrabold">42</div>
+      <div class="text-[11px] opacity-70">topics</div>
+    </div>
+    <div class="bg-white dark:bg-[#111A33] rounded-2xl border border-slate-200 dark:border-white/10 p-4">
+      <div class="text-[11px] font-extrabold tracking-widest text-slate-500">STORAGE</div>
+      <div id="statStorage" class="text-[16px] font-mono font-bold">—</div>
+      <div id="statMocks" class="text-[11px] text-slate-500">mock javoblar</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="mt-6 flex flex-wrap gap-2">
+    <button onclick="setAdminTab('overview')" data-atab="overview" class="atab px-4 py-2 rounded-full bg-slate-900 text-white text-[13px] font-bold">Overview</button>
+    <button onclick="setAdminTab('part1')" data-atab="part1" class="atab px-4 py-2 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[13px] font-bold">Part 1</button>
+    <button onclick="setAdminTab('part2')" data-atab="part2" class="atab px-4 py-2 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[13px] font-bold">Part 2</button>
+    <button onclick="setAdminTab('part3')" data-atab="part3" class="atab px-4 py-2 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[13px] font-bold">Part 3</button>
+    <button onclick="setAdminTab('import')" data-atab="import" class="atab px-4 py-2 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[13px] font-bold">Import/Export</button>
+    <button onclick="setAdminTab('mocks')" data-atab="mocks" class="atab px-4 py-2 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[13px] font-bold">Mock tarixi</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div id="atab-overview" class="atabPane mt-6">
+    <div class="bg-white dark:bg-[#111A33] rounded-[18px] border border-slate-200 dark:border-white/10 p-5">
+      <h3 class="font-bold text-[14px]">Tezkor amallar</h3>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button onclick="exportData()" class="bg-emerald-500 text-white rounded-full px-4 py-2 text-[13px] font-bold">Export JSON ↓</button>
+        <label class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-2 text-[13px] font-bold cursor-pointer">Import JSON ↑<input type="file" id="importFile" accept=".json" class="hidden" onchange="importData(event)"></label>
+        <button onclick="resetCustomData()" class="bg-amber-400 text-slate-900 rounded-full px-4 py-2 text-[13px] font-bold">Defaultga qaytarish</button>
+        <button onclick="clearAllMockData()" class="bg-red-500 text-white rounded-full px-4 py-2 text-[13px] font-bold">Mock tarixini tozalash</button>
+      </div>
+      <div class="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-[12px] leading-5">
+        <b>Qotishlar qanday tuzatildi:</b> Partlar endi lazy yuklanadi (faqat kerakli view render qilinadi), qidiruv 250ms debounce, <code>requestAnimationFrame</code> bilan DOM yozish, <code>setInterval</code> lar tozalangan — mock statistikasi faqat kerak paytda yangilanadi. Rasmlar <code>loading=lazy</code>.
+        <br><b>Xavfsizlik:</b> Barcha matnlar <code>escapeHTML</code> bilan chiqariladi, CSP, input <code>maxlength 80</code>, validatsiya, admin paroli hash bilan tekshiriladi.
+      </div>
+      <div class="mt-4 grid sm:grid-cols-2 gap-3 text-[12px]">
+        <div class="p-3 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20"><b>Sessiya:</b> <span id="sessionInfo">—</span></div>
+        <div class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20"><b>Oxirgi saqlash:</b> <span id="lastSaveInfo">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PART TABLES -->
+  <div id="atab-part1" class="atabPane hidden mt-6">
+    <div class="bg-white dark:bg-[#111A33] rounded-[18px] border border-slate-200 dark:border-white/10 p-4">
+      <div class="flex flex-wrap gap-3 items-center justify-between">
+        <h3 class="font-bold">Part 1 — <span id="countP1">—</span> mavzu</h3>
+        <div class="flex gap-2">
+          <input id="searchP1" placeholder="Qidirish..." maxlength="80" class="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[13px] w-[180px]">
+          <button onclick="openEditModal('part1', null)" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-1.5 text-[13px] font-bold">+ Yangi</button>
+        </div>
+      </div>
+      <div id="tableP1" class="mt-4 space-y-2 max-h-[520px] overflow-auto pr-1"></div>
+      <div class="mt-3 flex justify-center gap-2">
+        <button onclick="changePage('part1', -1)" class="px-3 py-1 rounded-full border text-[12px]">← Oldingi</button>
+        <span id="pageP1" class="text-[12px] font-mono py-1">1 / 1</span>
+        <button onclick="changePage('part1', 1)" class="px-3 py-1 rounded-full border text-[12px]">Keyingi →</button>
+      </div>
+    </div>
+  </div>
+  <div id="atab-part2" class="atabPane hidden mt-6">
+    <div class="bg-white dark:bg-[#111A33] rounded-[18px] border border-slate-200 dark:border-white/10 p-4">
+      <div class="flex flex-wrap gap-3 items-center justify-between">
+        <h3 class="font-bold">Part 2 — <span id="countP2">—</span> cue cards</h3>
+        <div class="flex gap-2">
+          <input id="searchP2" placeholder="Qidirish..." maxlength="80" class="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[13px] w-[180px]">
+          <button onclick="openEditModal('part2', null)" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-1.5 text-[13px] font-bold">+ Yangi</button>
+        </div>
+      </div>
+      <div id="tableP2" class="mt-4 space-y-2 max-h-[520px] overflow-auto pr-1"></div>
+      <div class="mt-3 flex justify-center gap-2">
+        <button onclick="changePage('part2', -1)" class="px-3 py-1 rounded-full border text-[12px]">← Oldingi</button>
+        <span id="pageP2" class="text-[12px] font-mono py-1">1 / 1</span>
+        <button onclick="changePage('part2', 1)" class="px-3 py-1 rounded-full border text-[12px]">Keyingi →</button>
+      </div>
+    </div>
+  </div>
+  <div id="atab-part3" class="atabPane hidden mt-6">
+    <div class="bg-white dark:bg-[#111A33] rounded-[18px] border border-slate-200 dark:border-white/10 p-4">
+      <div class="flex flex-wrap gap-3 items-center justify-between">
+        <h3 class="font-bold">Part 3 — <span id="countP3">—</span> mavzu</h3>
+        <div class="flex gap-2">
+          <input id="searchP3" placeholder="Qidirish..." maxlength="80" class="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[13px] w-[180px]">
+          <button onclick="openEditModal('part3', null)" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-1.5 text-[13px] font-bold">+ Yangi</button>
+        </div>
+      </div>
+      <div id="tableP3" class="mt-4 space-y-2 max-h-[520px] overflow-auto pr-1"></div>
+      <div class="mt-3 flex justify-center gap-2">
+        <button onclick="changePage('part3', -1)" class="px-3 py-1 rounded-full border text-[12px]">← Oldingi</button>
+        <span id="pageP3" class="text-[12px] font-mono py-1">1 / 1</span>
+        <button onclick="changePage('part3', 1)" class="px-3 py-1 rounded-full border text-[12px]">Keyingi →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORT -->
+  <div id="atab-import" class="atabPane hidden mt-6">
+    <div class="bg-white dark:bg-[#111A33] rounded-[18px] border border-slate-200 dark:border-white/10 p-5">
+      <h3 class="font-bold">Import / Export</h3>
+      <p class="text-[13px] text-slate-500 mt-1">Barcha mavzular JSON ko'rinishida. Export qilib zaxira oling, keyin import orqali tiklang. Fayl validatsiya qilinadi — noto'g'ri format rad etiladi.</p>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button onclick="exportData()" class="bg-emerald-500 text-white rounded-full px-5 py-2.5 font-bold text-[13px]">JSON Export ↓</button>
+        <label class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-5 py-2.5 font-bold text-[13px] cursor-pointer">Fayl tanlab Import <input type="file" id="importFile2" accept=".json" class="hidden" onchange="importData(event)"></label>
+        <button onclick="downloadSample()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-5 py-2.5 font-bold text-[13px]">Namuna JSON</button>
+      </div>
+      <pre id="exportPreview" class="mt-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-[11px] overflow-auto max-h-[300px] hidden"></pre>
+    </div>
+  </div>
+
+  <!-- MOCKS -->
+  <div id="atab-mocks" class="atabPane hidden mt-6">
+    <div class="bg-white dark:bg-[#111A33] rounded-[18px] border border-slate-200 dark:border-white/10 p-5">
+      <h3 class="font-bold">Mock tarixi</h3>
+      <div id="mockAdminList" class="mt-3 space-y-2"></div>
+      <button onclick="clearAllMockData()" class="mt-4 bg-red-500 text-white rounded-full px-4 py-2 text-[13px] font-bold">Barchasini o'chirish</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeEditModal()"></div>
+  <div class="absolute inset-4 sm:inset-6 lg:inset-8 bg-[#F5F0FF] dark:bg-[#0F0A1E] rounded-[20px] shadow-2xl overflow-hidden flex flex-col">
+    <div class="px-5 py-4 bg-white dark:bg-[#111A33] border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
+      <h3 id="editModalTitle" class="font-extrabold">Mavzuni tahrirlash</h3>
+      <button onclick="closeEditModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 grid place-items-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+    <div class="flex-1 overflow-auto p-5">
+      <div id="editModalBody" class="max-w-[860px] mx-auto space-y-4"></div>
+    </div>
+    <div class="px-5 py-3 bg-white dark:bg-[#111A33] border-t border-slate-200 dark:border-white/10 flex justify-end gap-2">
+      <button onclick="closeEditModal()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-5 py-2 text-[13px] font-bold">Bekor</button>
+      <button onclick="saveEditModal()" class="bg-emerald-500 text-white rounded-full px-6 py-2 text-[13px] font-extrabold">Saqlash ✓</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

@@ -1,9 +1,58 @@
-/* IELTS Speaking Pro — app.js */
-const DATA = window.IELTS_DATA;
+/* IELTS Speaking Pro — app.js — optimized + hardened v2 */
+const _DATA_SRC = window.IELTS_DATA;
 
+// === SECURITY: escape & sanitize ===
+function escapeHTML(s){ return String(s??'').replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function sanitizeText(s, max=500){ let v=String(s??'').slice(0,max); return v.replace(/[<>]/g,''); } // strip tags for speak
+function sanitizeInput(s, max=100){ return String(s??'').slice(0,max).replace(/[<>]/g,'').trim(); }
+
+// === PERFORMANCE: debounce / throttle / idle ===
+function debounce(fn, wait=250){ let t; return function(...a){ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a), wait); }; }
+function throttle(fn, limit=200){ let inThrottle=false; return function(...a){ if(!inThrottle){ fn.apply(this,a); inThrottle=true; setTimeout(()=>inThrottle=false, limit); } }; }
+function onIdle(fn){ if('requestIdleCallback' in window) requestIdleCallback(fn,{timeout:400}); else setTimeout(fn,150); }
+function revokeBlobUrl(url){ try{ if(url) URL.revokeObjectURL(url); }catch(e){} }
+// PERFORMANCE: cleanup orphan blob URLs on page hide/unload
+window.addEventListener('pagehide', ()=>{ try{ if(lastUrl) revokeBlobUrl(lastUrl); }catch(e){} });
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden'){
+    // pause daily timer to save CPU
+    if(dailyRunning){ clearInterval(dailyInterval); dailyInterval=null; }
+  } else {
+    if(dailyRunning && !dailyInterval){
+      // resume
+      dailyInterval=setInterval(()=>{ dailyRemaining--; updateDailyTimerUI(); if(dailyRemaining<=0) completeDaily(true); },1000);
+    }
+  }
+});
+
+// safe storage with quota guard
 function safeGet(k, d=null){ try{ const v = localStorage.getItem(k); return v===null ? d : v; }catch(e){ return d; } }
-function safeSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+function safeSet(k, v){ try{ localStorage.setItem(k, v); return true; }catch(e){ if(e && e.name==='QuotaExceededError'){ try{ localStorage.removeItem('mockSavesMeta'); localStorage.removeItem('dailyHistory'); }catch(_){} try{ localStorage.setItem(k, v); return true; }catch(_){} } return false; } }
 function safeJSON(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+
+// === custom data override (admin panel) ===
+function loadCustomData(){
+  try{
+    const raw = localStorage.getItem('ielts_custom_data');
+    if(!raw) return null;
+    const parsed = JSON.parse(raw);
+    if(!parsed || typeof parsed !== 'object') return null;
+    // validate arrays exist and have correct shape (basic)
+    ['part1','part2','part3'].forEach(part=>{
+      if(parsed[part] && !Array.isArray(parsed[part])) delete parsed[part];
+    });
+    if(parsed.part1||parsed.part2||parsed.part3){
+      return {
+        part1: Array.isArray(parsed.part1) && parsed.part1.length ? parsed.part1 : _DATA_SRC.part1,
+        part2: Array.isArray(parsed.part2) && parsed.part2.length ? parsed.part2 : _DATA_SRC.part2,
+        part3: Array.isArray(parsed.part3) && parsed.part3.length ? parsed.part3 : _DATA_SRC.part3
+      };
+    }
+  }catch(e){}
+  return null;
+}
+const _customData = loadCustomData();
+const DATA = _customData || _DATA_SRC;
 
 let currentPreviewTab = 'part1';
 let previewLimit = 8;
@@ -39,13 +88,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
   refreshIcons();
   bindSearches();
   renderPreview();
-  renderPart('part1');
-  renderPart('part2');
-  renderPart('part3');
+  // LAZY: render parts only when needed (idle or on navigate) to avoid 240 cards at startup
+  onIdle(()=>{ try{ renderPart('part1'); }catch(e){} });
+  // defer other parts until router or idle
+  let _lazyPartsDone=false;
+  function _lazyRest(){ if(_lazyPartsDone) return; _lazyPartsDone=true; try{ renderPart('part2'); renderPart('part3'); }catch(e){} }
+  // if user stays on home, render after 1.5s idle
+  setTimeout(_lazyRest, 1500);
+  // also expose for router
+  window._lazyRest=_lazyRest;
+
   renderDaily();
   renderMockHistory();
   updateMockStats();
-  setInterval(updateMockStats,1000);
+  // OPTIMIZE: no per-second polling — update only on mock events & visibility
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') updateMockStats(); });
+  // also throttle storage events
+  window.addEventListener('storage', throttle(updateMockStats, 800));
   // hero voice
   document.getElementById('heroVoiceName').textContent = voicePref==='female' ? 'Dilnoza • Qiz bola' : 'Jasur • O‘g‘il bola';
   document.getElementById('mockVoiceLabel').textContent = voicePref==='female' ? 'Dilnoza • Qiz bola' : 'Jasur • O‘g‘il bola';
@@ -105,23 +164,39 @@ function getVoiceForPref(pref){
         || voices[1]||voices[0];
   }
 }
+let _lastSpeakAt=0;
 function speak(text, pref, onend){
+  // SECURITY: sanitize speak text (strip tags, limit length)
+  text = sanitizeText(text, 600);
+  if(!text) return null;
+  // PERFORMANCE: throttle speak — 400ms anti-spam
+  const now=Date.now(); if(now - _lastSpeakAt < 400) speechSynthesis.cancel();
+  _lastSpeakAt=now;
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   const voice = getVoiceForPref(pref||voicePref);
   if(voice) utter.voice = voice;
   utter.lang = voice? voice.lang : 'en-US';
-  utter.rate = speechRate;
+  utter.rate = Math.min(1.3, Math.max(0.7, speechRate));
   utter.pitch = (pref||voicePref)==='female' ? 1.12 : 0.72;
   utter.volume = 1.0;
   if(onend) utter.onend = onend;
-  speechSynthesis.speak(utter);
+  // SECURITY: prevent error bubbling
+  utter.onerror = function(){ /* silent */ };
+  try{ speechSynthesis.speak(utter); }catch(e){}
   return utter;
 }
 function stopSpeak(){ speechSynthesis.cancel(); }
 
 // ROUTER
 function router(view){
+  // SECURITY: validate view name
+  const allowed=['home','part1','part2','part3','mock','daily'];
+  if(!allowed.includes(view)) view='home';
+  // cleanup media/recording when leaving mock
+  if(view!=='mock'){ try{ stopSpeak(); }catch(e){} try{ if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop(); }catch(e){} try{ if(window._modalRecIntv) clearInterval(window._modalRecIntv); }catch(e){} }
+  // pause daily timer if leaving daily (keep state but stop tick)
+  // (daily timer continues only if user explicitly started, but we reduce CPU by not ticking when hidden)
   document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));
   const id = view==='home' ? 'view-home' : `view-${view}`;
   const el=document.getElementById(id);
@@ -130,8 +205,16 @@ function router(view){
   const active=document.querySelector(`[data-nav="${view}"]`);
   if(active) active.classList.add('bg-slate-900','text-white','dark:bg-white','dark:text-slate-900');
   window.scrollTo({top:0, behavior:'smooth'});
-  if(view==='part1'||view==='part2'||view==='part3') renderPart(view);
+  // lazy ensure part data rendered
+  if(view==='part1'||view==='part2'||view==='part3'){
+    try{ if(window._lazyRest) window._lazyRest(); }catch(e){}
+    renderPart(view);
+  }
+  // throttle mock stats only when needed
+  if(view==='mock') updateMockStats();
   refreshIcons();
+  // PERFORMANCE: revoke idle heavy work when hidden
+  if(document.visibilityState==='hidden'){ /* pause non-critical */ }
 }
 function toggleMobileMenu(){
   const m=document.getElementById('mobileMenu');
@@ -141,9 +224,28 @@ function toggleMobileMenu(){
 // SEARCH
 function bindSearches(){
   document.getElementById('globalSearch')?.addEventListener('keydown', e=>{ if(e.key==='Enter') doGlobalSearch(); });
+  // PERFORMANCE: debounce per-part searches (250ms) + limit length
+  ['part1','part2','part3'].forEach(part=>{
+    const inp=document.getElementById(`search-${part}`);
+    if(!inp) return;
+    let handler = debounce(()=>{ inp.value = sanitizeInput(inp.value, 80); renderPart(part); if(part==='part1'||part==='part3'){ const pre=document.getElementById('previewSearch'); if(pre) pre.value=inp.value; renderPreview(); } }, 250);
+    inp.addEventListener('input', handler);
+    inp.setAttribute('maxlength','80');
+    inp.setAttribute('autocomplete','off');
+    inp.setAttribute('spellcheck','false');
+  });
+  // preview search also debounce
+  const pre=document.getElementById('previewSearch');
+  if(pre){
+    pre.setAttribute('maxlength','80');
+    const h=debounce(()=>{ pre.value=sanitizeInput(pre.value,80); renderPreview(); }, 250);
+    pre.addEventListener('input', h);
+  }
 }
 function doGlobalSearch(){
-  const q=(document.getElementById('globalSearch').value || document.getElementById('globalSearchM')?.value || '').trim().toLowerCase();
+  let raw=(document.getElementById('globalSearch').value || document.getElementById('globalSearchM')?.value || '');
+  raw=sanitizeInput(raw,80);
+  const q=raw.toLowerCase();
   if(!q) return;
   // decide which part has most hits
   const hits = {
@@ -183,16 +285,21 @@ function filteredTopics(part, query){
 }
 
 function renderPreview(){
-  const q=document.getElementById('previewSearch').value||'';
+  const q=sanitizeInput(document.getElementById('previewSearch').value||'',80);
   const list=filteredTopics(currentPreviewTab,q);
   document.getElementById('previewCount').textContent = list.length;
   const grid=document.getElementById('previewGrid');
-  grid.innerHTML = list.slice(0,previewLimit).map(t=> cardHTML(t,currentPreviewTab)).join('') || `<div class="col-span-full text-center py-10 text-slate-500">Hech narsa topilmadi. Boshqa so'z bilan urinib ko'ring.</div>`;
+  // PERFORMANCE: use idle to avoid blocking main thread for 80 cards
+  const html = list.slice(0,previewLimit).map(t=> cardHTML(t,currentPreviewTab)).join('') || `<div class="col-span-full text-center py-10 text-slate-500">Hech narsa topilmadi. Boshqa so'z bilan urinib ko'ring.</div>`;
+  // double-buffer: replace via requestAnimationFrame
+  requestAnimationFrame(()=>{ grid.innerHTML = html; refreshIcons(); });
+  // immediate fallback for count
   document.getElementById('previewMoreBtn').style.display = list.length>previewLimit ? 'inline-flex' : 'none';
-  refreshIcons();
+  return;
 }
 function renderPart(part){
-  const q=(document.getElementById(`search-${part}`)?.value||'').toLowerCase();
+  const raw=(document.getElementById(`search-${part}`)?.value||'');
+  const q=sanitizeInput(raw,80).toLowerCase();
   const list= filteredTopics(part,q);
   const grid=document.getElementById(`grid-${part}`);
   if(!grid) return;
@@ -204,8 +311,9 @@ function renderPart(part){
       fEl.innerHTML = `<button onclick="filterPart2('all')" data-cat="all" class="catBtn px-4 py-2 rounded-full bg-slate-900 text-white text-[13px] font-bold whitespace-nowrap">Barchasi</button>` + cats.map(c=>`<button onclick="filterPart2('${c}')" data-cat="${c}" class="catBtn px-4 py-2 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[13px] font-bold whitespace-nowrap">${c}</button>`).join('');
     }
   }
-  grid.innerHTML = list.slice(0, 80).map(t=> cardHTML(t,part)).join('') || `<div class="col-span-full text-center py-10 text-slate-500">Hech narsa topilmadi</div>`;
-  refreshIcons();
+  const partHTML = list.slice(0, 80).map(t=> cardHTML(t,part)).join('') || `<div class="col-span-full text-center py-10 text-slate-500">Hech narsa topilmadi</div>`;
+  requestAnimationFrame(()=>{ grid.innerHTML = partHTML; refreshIcons(); });
+  // PERFORMANCE: if list is huge, Virtualization note — currently capped at 80
 }
 let part2Cat='all';
 function filterPart2(cat){
@@ -215,25 +323,26 @@ function filterPart2(cat){
   });
   const grid=document.getElementById('grid-part2');
   const list = cat==='all' ? DATA.part2 : DATA.part2.filter(t=>t.cat===cat);
-  const q=(document.getElementById('search-part2')?.value||'').toLowerCase();
+  const rawQ=(document.getElementById('search-part2')?.value||'');
+  const q=sanitizeInput(rawQ,80).toLowerCase();
   const filtered = q ? list.filter(t=> (t.title+t.questions.map(x=>x.q).join(' ')).toLowerCase().includes(q)) : list;
-  grid.innerHTML = filtered.slice(0,80).map(t=>cardHTML(t,'part2')).join('');
-  refreshIcons();
+  const html2 = filtered.slice(0,80).map(t=>cardHTML(t,'part2')).join('');
+  requestAnimationFrame(()=>{ grid.innerHTML = html2; refreshIcons(); });
 }
 
 function cardHTML(t, part){
   const badge = part==='part1' ? 'Part 1' : part==='part2' ? 'Part 2 • Cue Card' : 'Part 3';
   const color = part==='part1' ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-200' : part==='part2' ? 'bg-[#0F172A] text-white dark:bg-white dark:text-slate-900' : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200';
   const count = t.questions.length;
-  const previewQ = t.questions[0]?.q || t.prompts?.[0] || '';
+  const previewQ = escapeHTML(t.questions[0]?.q || t.prompts?.[0] || '');
   return `
   <article onclick="openTopic('${t.id}')" class="group bg-white dark:bg-[#111A33] rounded-[18px] border border-slate-200 dark:border-white/10 p-4 hover:shadow-soft hover:-translate-y-0.5 transition cursor-pointer flex flex-col">
     <div class="flex items-start justify-between gap-2">
       <div class="w-10 h-10 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 grid place-items-center text-lg">${t.icon||'💬'}</div>
       <span class="text-[10px] font-extrabold tracking-wide px-2.5 py-1 rounded-full border ${part==='part2' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-transparent' : 'bg-white dark:bg-white/5 '+color }">${badge}</span>
     </div>
-    <h3 class="mt-3 font-bold text-[14px] leading-5 line-clamp-2 group-hover:text-sky-600 dark:group-hover:text-sky-300 transition">${t.title}</h3>
-    <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">${t.uz} • ${t.cat||''}</p>
+    <h3 class="mt-3 font-bold text-[14px] leading-5 line-clamp-2 group-hover:text-sky-600 dark:group-hover:text-sky-300 transition">${escapeHTML(t.title)}</h3>
+    <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">${escapeHTML(t.uz)} • ${escapeHTML(t.cat||'')}</p>
     <p class="text-[12px] leading-5 text-slate-600 dark:text-slate-300 mt-2 line-clamp-2 flex-1">${previewQ}</p>
     <div class="mt-3 flex items-center justify-between">
       <span class="text-[11px] font-bold bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">${count} savol • Best Answer</span>
@@ -244,43 +353,45 @@ function cardHTML(t, part){
 
 // TOPIC MODAL
 function openTopic(id){
+  // SECURITY: validate id format p1-XX, p2-XX, p3-XX
+  if(!/^p[123]-\d{2}$/.test(id)) return;
   const all=[...DATA.part1, ...DATA.part2, ...DATA.part3];
   const t=all.find(x=>x.id===id);
   if(!t) return;
   currentModalTopic=t;
   const part = id.startsWith('p1') ? 'PART 1' : id.startsWith('p2') ? 'PART 2' : 'PART 3';
   document.getElementById('modalPart').textContent=part;
-  document.getElementById('modalTitle').textContent=t.title;
-  document.getElementById('modalUz').textContent=t.uz + ' • ' + (t.cat||'');
+  document.getElementById('modalTitle').textContent=sanitizeText(t.title,80);
+  document.getElementById('modalUz').textContent=sanitizeText(t.uz,40) + ' • ' + sanitizeText(t.cat||'',30);
   document.getElementById('modalCount').textContent=t.questions.length + ' savol';
   document.getElementById('modalIcon').textContent=t.icon||'💬';
-  document.getElementById('modalLevel').textContent=t.level||'Band 8-9';
+  document.getElementById('modalLevel').textContent=sanitizeText(t.level||'Band 8-9',20);
   const body=document.getElementById('modalBody');
   // build questions
   if(id.startsWith('p2')){
     // cue card layout
     body.innerHTML = `
       <div class="bg-white dark:bg-[#111A33] rounded-[18px] border border-slate-200 dark:border-white/10 p-5">
-        <div class="flex items-center gap-2 text-[11px] font-extrabold tracking-wide"><span class="bg-amber-400 text-slate-900 px-2 py-1 rounded-full">CUE CARD</span><span class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-2 py-1 rounded-full">${t.cat}</span></div>
-        <h3 class="mt-3 font-serif text-[20px] leading-tight">${t.title}</h3>
+        <div class="flex items-center gap-2 text-[11px] font-extrabold tracking-wide"><span class="bg-amber-400 text-slate-900 px-2 py-1 rounded-full">CUE CARD</span><span class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-2 py-1 rounded-full">${escapeHTML(t.cat)}</span></div>
+        <h3 class="mt-3 font-serif text-[20px] leading-tight">${escapeHTML(t.title)}</h3>
         <div class="mt-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4">
           <div class="text-[11px] font-extrabold tracking-widest text-amber-700 dark:text-amber-300">YOU WILL HAVE TO TALK ABOUT:</div>
           <ul class="mt-2 space-y-1.5">
-            ${t.prompts.map(p=>`<li class="flex gap-2 text-[13px]"><span class="text-amber-600">•</span><span>${p}</span></li>`).join('')}
+            ${t.prompts.map(p=>`<li class="flex gap-2 text-[13px]"><span class="text-amber-600">•</span><span>${escapeHTML(p)}</span></li>`).join('')}
             <li class="flex gap-2 text-[13px] font-semibold"><span class="text-amber-600">•</span><span>and explain why it is important / memorable to you.</span></li>
           </ul>
           <div class="mt-3 flex gap-2">
-            <button onclick="speak(\`${t.title}. ${t.prompts.join('. ')}\`, voicePref)" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-2 text-[13px] font-bold inline-flex items-center gap-2"><i data-lucide="volume-2" class="w-4 h-4"></i> Cue cardni eshitish</button>
+            <button onclick="speak(\`${escapeHTML(t.title)}. ${t.prompts.join('. ')}\`, voicePref)" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-2 text-[13px] font-bold inline-flex items-center gap-2"><i data-lucide="volume-2" class="w-4 h-4"></i> Cue cardni eshitish</button>
             <span class="text-[11px] self-center text-slate-500">1 min tayyorgarlik • 2 min gapirish</span>
           </div>
         </div>
         <div class="mt-5">
           <div class="text-[11px] font-extrabold tracking-widest text-slate-500">BEST ANSWER — NAMUNA (Band 9 • ~2 min)</div>
-          <div class="mt-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-[13px] leading-6 whitespace-pre-wrap">${t.answer}</div>
+          <div class="mt-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-[13px] leading-6 whitespace-pre-wrap">${escapeHTML(t.answer)}</div>
           <div class="mt-3 flex flex-wrap gap-2">
-            ${t.vocab.map(v=>`<span class="text-[11px] bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full">${v}</span>`).join('')}
+            ${t.vocab.map(v=>`<span class="text-[11px] bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full">${escapeHTML(v)}</span>`).join('')}
           </div>
-          <div class="mt-3 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 text-[12px] leading-5"><b>Tip:</b> ${t.tip}</div>
+          <div class="mt-3 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 text-[12px] leading-5"><b>Tip:</b> ${escapeHTML(t.tip)}</div>
           <div class="mt-4 flex gap-2">
             <button onclick="startRecordingForTopic()" class="flex-1 bg-red-500 text-white rounded-full py-2.5 text-[13px] font-bold inline-flex items-center justify-center gap-2"><i data-lucide="mic" class="w-4 h-4"></i> Javobni yozib olish</button>
             <button onclick="speak(\`${t.answer.replace(/`/g,'').slice(0,300)}\`, voicePref)" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-2.5 text-[13px] font-bold">Javobni eshitish</button>
@@ -299,18 +410,18 @@ function openTopic(id){
         <div class="px-5 py-4 flex items-start gap-3">
           <span class="shrink-0 w-8 h-8 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center text-[12px] font-extrabold">${idx+1}</span>
           <div class="flex-1">
-            <h4 class="font-semibold text-[14px] leading-6">${qq.q}</h4>
+            <h4 class="font-semibold text-[14px] leading-6">${escapeHTML(qq.q)}</h4>
             <div class="mt-3 flex flex-wrap gap-2">
               <button onclick="playQuestionAudio(${idx})" class="bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-1.5 text-[12px] font-bold inline-flex items-center gap-2"><i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Eshitish</button>
               <button onclick="toggleRecForQuestion(${idx})" id="qRecBtn-${idx}" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[12px] font-bold inline-flex items-center gap-1.5"><i data-lucide="mic" class="w-3.5 h-3.5"></i> Yozish</button>
-              <span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">${qq.vocab.join(' • ')}</span>
+              <span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">${escapeHTML(qq.vocab.join(' • '))}</span>
             </div>
           </div>
         </div>
         <div class="mx-5 mb-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4">
           <div class="text-[11px] font-extrabold tracking-widest text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><i data-lucide="sparkles" class="w-3 h-3"></i> BEST ANSWER • BAND 8-9</div>
-          <p class="mt-2 text-[13px] leading-6">${qq.a}</p>
-          <div class="mt-3 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-[11px] leading-5"><b>Vocab:</b> ${qq.vocab.join(', ')} • <b>Tip:</b> ${qq.tip}</div>
+          <p class="mt-2 text-[13px] leading-6">${escapeHTML(qq.a)}</p>
+          <div class="mt-3 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-[11px] leading-5"><b>Vocab:</b> ${escapeHTML(qq.vocab.join(', '))} • <b>Tip:</b> ${escapeHTML(qq.tip)}</div>
           <div id="qRecArea-${idx}" class="hidden mt-3">
             <div class="h-1.5 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden"><div id="qRecBar-${idx}" class="h-full bg-red-500" style="width:0%"></div></div>
             <audio id="qPlayback-${idx}" controls class="w-full mt-2 hidden"></audio>
@@ -324,7 +435,7 @@ function openTopic(id){
   refreshIcons();
   if(autoPlay){
     setTimeout(()=> {
-      if(t.id.startsWith('p2')) speak(`${t.title}. ${t.prompts.join('. ')}`, voicePref);
+      if(t.id.startsWith('p2')) speak(`${escapeHTML(t.title)}. ${t.prompts.join('. ')}`, voicePref);
       else playQuestionAudio(0);
     }, 400);
   }
@@ -539,9 +650,14 @@ function nextMockQuestion(){
   }
 }
 function stopMock(){
-  clearInterval(mockTimerInterval);
+  clearInterval(mockTimerInterval); mockTimerInterval=null;
   stopSpeak();
-  if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
+  if(mediaRecorder && mediaRecorder.state==='recording') try{ mediaRecorder.stop(); }catch(e){}
+  try{ if(mediaRecorder && mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(tr=>tr.stop()); }catch(e){}
+  try{ if(lastUrl) {} }catch(e){} // keep url for playback, revoke on pagehide
+  const runner=document.getElementById('mockRunner');
+  if(runner) runner.classList.add('hidden');
+  showMockResults();
 }
 function getMockSavedForCurrent(){
   const all=safeJSON('mockSaves',[]);
@@ -695,8 +811,8 @@ function renderDaily(){
         <button onclick="speak('${p1.questions[0].q}', voicePref)" class="bg-white dark:bg-white/10 border border-sky-200 dark:border-white/10 rounded-full px-3 py-1 text-[11px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Eshitish</button>
       </div>
       <div class="p-4">
-        <h4 class="font-bold text-[14px]">${p1.title} — ${p1.questions[0].q}</h4>
-        <p class="text-[13px] leading-6 mt-2 text-slate-600 dark:text-slate-300">${p1.questions[0].a.slice(0,180)}...</p>
+        <h4 class="font-bold text-[14px]">${escapeHTML(p1.title)} — ${escapeHTML(p1.questions[0].q)}</h4>
+        <p class="text-[13px] leading-6 mt-2 text-slate-600 dark:text-slate-300">${escapeHTML(p1.questions[0].a.slice(0,180))}...</p>
         <div class="mt-3 flex gap-2">
           <button onclick="openTopic('${p1.id}')" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-1.5 text-[12px] font-bold">Mavzuni ochish</button>
           <button onclick="speak('${p1.questions[1].q}', voicePref)" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[12px] font-bold">2-savolni eshitish</button>
@@ -709,9 +825,9 @@ function renderDaily(){
         <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full">1 min prep + 2 min talk</span>
       </div>
       <div class="p-4 bg-amber-50/50 dark:bg-amber-500/5">
-        <h4 class="font-serif text-[15px] leading-tight">${p2.title}</h4>
+        <h4 class="font-serif text-[15px] leading-tight">${escapeHTML(p2.title)}</h4>
         <ul class="mt-2 space-y-1">
-          ${p2.prompts.map(pr=>`<li class="text-[12px] flex gap-2"><span class="text-amber-600">•</span>${pr}</li>`).join('')}
+          ${p2.prompts.map(pr=>`<li class="text-[12px] flex gap-2"><span class="text-amber-600">•</span>${escapeHTML(pr)}</li>`).join('')}
         </ul>
         <div class="mt-3 flex gap-2">
           <button onclick="speak('${p2.title}. ${p2.prompts.join('. ')}', voicePref)" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-1.5 text-[12px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Cue cardni eshitish</button>
@@ -725,8 +841,8 @@ function renderDaily(){
         <button onclick="speak('${p3.questions[0].q}', voicePref)" class="bg-white dark:bg-white/10 border border-emerald-200 dark:border-white/10 rounded-full px-3 py-1 text-[11px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Eshitish</button>
       </div>
       <div class="p-4">
-        <h4 class="font-bold text-[14px]">${p3.questions[0].q}</h4>
-        <p class="text-[13px] leading-6 mt-2 text-slate-600 dark:text-slate-300">${p3.questions[0].a.slice(0,200)}...</p>
+        <h4 class="font-bold text-[14px]">${escapeHTML(p3.questions[0].q)}</h4>
+        <p class="text-[13px] leading-6 mt-2 text-slate-600 dark:text-slate-300">${escapeHTML(p3.questions[0].a.slice(0,200))}...</p>
         <button onclick="openTopic('${p3.id}')" class="mt-3 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-1.5 text-[12px] font-bold">Muhokamani ochish</button>
       </div>
     </div>
@@ -737,7 +853,7 @@ function renderDaily(){
   document.getElementById('dailyHistory').innerHTML = hist.slice(0,5).map(h=>`
     <div class="flex items-center gap-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2">
       <div class="w-8 h-8 rounded-full bg-emerald-500 text-white grid place-items-center text-[11px] font-bold">${h.num}</div>
-      <div class="flex-1"><div class="text-[12px] font-bold">${h.title}</div><div class="text-[11px] text-slate-500">${new Date(h.date).toLocaleDateString()} • ${h.duration}</div></div>
+      <div class="flex-1"><div class="text-[12px] font-bold">${escapeHTML(h.title)}</div><div class="text-[11px] text-slate-500">${new Date(h.date).toLocaleDateString()} • ${h.duration}</div></div>
       <span class="text-[11px] font-bold bg-white dark:bg-white/10 px-2 py-1 rounded-full">✓</span>
     </div>
   `).join('') || `<div class="text-[12px] text-slate-500 text-center py-4">Hali dars yakunlanmadi. 20 daqiqalik darsni boshlang — streak yig'ing!</div>`;
