@@ -1,12 +1,17 @@
 /* IELTS Speaking Pro — app.js */
 const DATA = window.IELTS_DATA;
+
+function safeGet(k, d=null){ try{ const v = localStorage.getItem(k); return v===null ? d : v; }catch(e){ return d; } }
+function safeSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+function safeJSON(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+
 let currentPreviewTab = 'part1';
 let previewLimit = 8;
 let currentModalTopic = null;
-let speechRate = parseFloat(localStorage.getItem('voiceRate')||'1');
-let voicePref = localStorage.getItem('voicePref')||'female';
-let autoPlay = localStorage.getItem('autoPlay')!=='false';
-let theme = localStorage.getItem('theme')||'light';
+let speechRate = parseFloat(safeGet('voiceRate','1'));
+let voicePref = safeGet('voicePref','female');
+let autoPlay = safeGet('autoPlay','true')!=='false';
+let theme = safeGet('theme','light');
 
 // state for mock
 let mockQueue = [];
@@ -24,8 +29,8 @@ let lastUrl = null;
 let dailyInterval = null;
 let dailyRemaining = 20*60;
 let dailyRunning = false;
-let dailyNum = parseInt(localStorage.getItem('dailyNum')||'1');
-let streak = parseInt(localStorage.getItem('streak')||'1');
+let dailyNum = parseInt(safeGet('dailyNum','1'));
+let streak = parseInt(safeGet('streak','1'));
 
 document.addEventListener('DOMContentLoaded', ()=>{
   initTheme();
@@ -56,7 +61,7 @@ function initTheme(){
 }
 function toggleTheme(){ setTheme(theme==='dark'?'light':'dark'); }
 function setTheme(t){
-  theme=t; localStorage.setItem('theme',t);
+  theme=t; safeSet('theme',t);
   initTheme(); refreshIcons();
 }
 
@@ -68,18 +73,18 @@ function initVoiceUI(){
   document.getElementById('modalVoiceSwitch').value = voicePref;
 }
 function setVoice(v){
-  voicePref=v; localStorage.setItem('voicePref',v);
+  voicePref=v; safeSet('voicePref',v);
   document.getElementById('heroVoiceName').textContent = v==='female'?'Dilnoza • Qiz bola':'Jasur • O‘g‘il bola';
   document.getElementById('mockVoiceLabel').textContent = v==='female'?'Dilnoza • Qiz bola':'Jasur • O‘g‘il bola';
   initVoiceUI();
 }
 function setRate(v){
-  speechRate=parseFloat(v); localStorage.setItem('voiceRate',v);
+  speechRate=parseFloat(v); safeSet('voiceRate',v);
   document.getElementById('rateVal').textContent = speechRate.toFixed(1)+'×';
 }
 function saveSettings(){
   autoPlay=document.getElementById('autoPlay').checked;
-  localStorage.setItem('autoPlay',autoPlay);
+  safeSet('autoPlay',autoPlay);
 }
 function previewVoice(v){
   speak(v==='female'?"Hello, I'm Dilnoza. I will read your IELTS questions clearly and warmly. Let's practise together!":"Hello, I'm Jasur. I will read your IELTS questions confidently and clearly. Let's ace your speaking!", v);
@@ -386,9 +391,9 @@ function saveQRecording(topicId, qIdx, blob){
   const key='recs_'+topicId;
   const reader=new FileReader();
   reader.onload=()=>{
-    const arr=JSON.parse(localStorage.getItem(key)||'[]');
+    const arr=safeJSON(key,[]);
     arr.push({qIdx, date:new Date().toISOString(), size:blob.size});
-    localStorage.setItem(key, JSON.stringify(arr));
+    safeSet(key, JSON.stringify(arr));
   };
   reader.readAsDataURL(blob);
 }
@@ -450,9 +455,9 @@ function startMock(){
   renderMockQuestion();
   startMockTimer();
   // save start to history
-  const hist=JSON.parse(localStorage.getItem('mockHistory')||'[]');
+  const hist=safeJSON('mockHistory',[]);
   hist.unshift({date:new Date().toISOString(), total:mockQueue.length, status:'started'});
-  localStorage.setItem('mockHistory', JSON.stringify(hist.slice(0,20)));
+  safeSet('mockHistory', JSON.stringify(hist.slice(0,20)));
   renderMockHistory();
 }
 function startMockTimer(){
@@ -500,9 +505,9 @@ function nextMockQuestion(){
   } else {
     stopMock();
     // mark completed
-    const hist=JSON.parse(localStorage.getItem('mockHistory')||'[]');
+    const hist=safeJSON('mockHistory',[]);
     if(hist[0]) hist[0].status='completed';
-    localStorage.setItem('mockHistory', JSON.stringify(hist));
+    safeSet('mockHistory', JSON.stringify(hist));
     renderMockHistory(); updateMockStats();
     alert('Mock yakunlandi! Barcha javoblar saqlandi. History bo‘limida ko‘rishingiz mumkin.');
   }
@@ -513,7 +518,7 @@ function stopMock(){
   if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
 }
 function getMockSavedForCurrent(){
-  const all=JSON.parse(localStorage.getItem('mockSaves')||'[]');
+  const all=safeJSON('mockSaves',[]);
   // we store urls in memory only, so just return empty or from memory
   return window._mockSavesMem ? window._mockSavesMem.filter(s=> s.mockIdx===mockIndex) : [];
 }
@@ -571,14 +576,14 @@ function playLastRecording(){
 }
 function saveMockAnswer(){
   if(!lastBlob){ alert('Avval Record bosing va javob bering!'); return; }
-  const saves=JSON.parse(localStorage.getItem('mockSavesMeta')||'[]');
+  const saves=safeJSON('mockSavesMeta',[]);
   saves.push({q: mockQueue[mockIndex].q, date:new Date().toISOString(), duration: Math.floor((Date.now()-recStart)/1000)});
-  localStorage.setItem('mockSavesMeta', JSON.stringify(saves));
+  safeSet('mockSavesMeta', JSON.stringify(saves));
   // history
-  const hist=JSON.parse(localStorage.getItem('mockHistory')||'[]');
+  const hist=safeJSON('mockHistory',[]);
   // update
-  const done=parseInt(localStorage.getItem('mockDone')||'0')+1;
-  localStorage.setItem('mockDone', String(done));
+  const done=parseInt(safeGet('mockDone')||'0')+1;
+  safeSet('mockDone', String(done));
   updateMockStats();
   // download option
   const a=document.createElement('a');
@@ -590,8 +595,8 @@ function saveMockAnswer(){
   setTimeout(nextMockQuestion, 900);
 }
 function renderMockHistory(){
-  const hist=JSON.parse(localStorage.getItem('mockHistory')||'[]');
-  const meta=JSON.parse(localStorage.getItem('mockSavesMeta')||'[]');
+  const hist=safeJSON('mockHistory',[]);
+  const meta=safeJSON('mockSavesMeta',[]);
   const el=document.getElementById('mockHistory');
   if(!hist.length && !meta.length){
     el.innerHTML=`<div class="text-[13px] text-slate-500 text-center py-6">Hali mock topshirmadingiz.<br>Birinchi mockni boshlang — natijalar shu yerda saqlanadi.</div>`;
@@ -608,20 +613,20 @@ function renderMockHistory(){
     </div>
   `).join('');
   refreshIcons();
-  document.getElementById('mockStatsDone').textContent = meta.length || localStorage.getItem('mockDone')||'0';
+  document.getElementById('mockStatsDone').textContent = meta.length || safeGet('mockDone')||'0';
 }
 function clearMockHistory(){
   if(!confirm('Barcha mock tarixini o‘chirishni istaysizmi?')) return;
-  localStorage.removeItem('mockHistory');
-  localStorage.removeItem('mockSavesMeta');
-  localStorage.removeItem('mockDone');
+  safeSet('mockHistory', null); try{localStorage.removeItem('mockHistory')}catch(e){};
+  try{localStorage.removeItem('mockSavesMeta')}catch(e){};
+  try{localStorage.removeItem('mockDone')}catch(e){};
   window._mockSavesMem=[];
   renderMockHistory(); updateMockStats();
 }
 function updateMockStats(){
   const total = DATA.part1.length+DATA.part2.length+DATA.part3.length;
   document.getElementById('mockStatsTotal').textContent = (DATA.part1.length*4 + DATA.part2.length + DATA.part3.length*4);
-  const done = JSON.parse(localStorage.getItem('mockSavesMeta')||'[]').length;
+  const done = safeJSON('mockSavesMeta',[]).length;
   const el=document.getElementById('mockStatsDone');
   if(el) el.textContent=done;
 }
@@ -701,7 +706,7 @@ function renderDaily(){
   `;
   refreshIcons();
   // history
-  const hist=JSON.parse(localStorage.getItem('dailyHistory')||'[]');
+  const hist=safeJSON('dailyHistory',[]);
   document.getElementById('dailyHistory').innerHTML = hist.slice(0,5).map(h=>`
     <div class="flex items-center gap-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2">
       <div class="w-8 h-8 rounded-full bg-emerald-500 text-white grid place-items-center text-[11px] font-bold">${h.num}</div>
@@ -743,14 +748,14 @@ function completeDaily(auto){
   clearInterval(dailyInterval);
   dailyRunning=false;
   const p1 = DATA.part1[(dailyNum*7) % DATA.part1.length];
-  const hist=JSON.parse(localStorage.getItem('dailyHistory')||'[]');
+  const hist=safeJSON('dailyHistory',[]);
   hist.unshift({num:dailyNum, title:p1.title, date:new Date().toISOString(), duration: auto?'20:00 auto': `${20*60 - dailyRemaining} sec`});
-  localStorage.setItem('dailyHistory', JSON.stringify(hist.slice(0,20)));
+  safeSet('dailyHistory', JSON.stringify(hist.slice(0,20)));
   // next lesson
   dailyNum++;
   streak++;
-  localStorage.setItem('dailyNum', String(dailyNum));
-  localStorage.setItem('streak', String(streak));
+  safeSet('dailyNum', String(dailyNum));
+  safeSet('streak', String(streak));
   dailyRemaining=20*60;
   renderDaily();
   document.getElementById('dailyToggle').textContent='Boshlash';

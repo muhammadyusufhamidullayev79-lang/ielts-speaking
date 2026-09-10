@@ -332,7 +332,7 @@ function buildData(){
   return {part1, part2, part3};
 }
 
-const DATA = buildData();
+const DATA_SRC = buildData();
 
 // expose
-if(typeof window!=="undefined") window.IELTS_DATA = DATA;
+if(typeof window!=="undefined") window.IELTS_DATA = DATA_SRC;
