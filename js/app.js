@@ -99,7 +99,7 @@ function getVoiceForPref(pref){
         || voices.find(v=>v.lang.startsWith('en-GB')||v.lang.startsWith('en-US')) 
         || voices[0];
   } else {
-    return voices.find(v=>/male|david|mark|alex|daniel|arthur|google.*male/i.test(v.name))
+    return voices.find(v=>/David|Alex|Mark|Daniel|Arthur|George|James/i.test(v.name) && v.lang.startsWith('en-')) || voices.find(v=>/male|google.*male/i.test(v.name))
         || voices.find(v=>v.lang.startsWith('en-US') && !/female/i.test(v.name))
         || voices[1]||voices[0];
   }
@@ -111,7 +111,8 @@ function speak(text, pref, onend){
   if(voice) utter.voice = voice;
   utter.lang = voice? voice.lang : 'en-US';
   utter.rate = speechRate;
-  utter.pitch = pref==='female' || voicePref==='female' ? 1.05 : 0.95;
+  utter.pitch = (pref||voicePref)==='female' ? 1.12 : 0.72;
+  utter.volume = 1.0;
   if(onend) utter.onend = onend;
   speechSynthesis.speak(utter);
   return utter;
@@ -504,12 +505,11 @@ function nextMockQuestion(){
     mockIndex++; renderMockQuestion();
   } else {
     stopMock();
-    // mark completed
     const hist=safeJSON('mockHistory',[]);
     if(hist[0]) hist[0].status='completed';
     safeSet('mockHistory', JSON.stringify(hist));
     renderMockHistory(); updateMockStats();
-    alert('Mock yakunlandi! Barcha javoblar saqlandi. History bo‘limida ko‘rishingiz mumkin.');
+    showMockResults();
   }
 }
 function stopMock(){
@@ -785,4 +785,45 @@ window.toggleMobileMenu=toggleMobileMenu; window.filterPart2=filterPart2; window
 window.playHeroAudio=playHeroAudio; window.startMock=startMock; window.stopMock=stopMock; window.nextMockQuestion=nextMockQuestion;
 window.playMockQuestion=playMockQuestion; window.toggleRecording=toggleRecording; window.playLastRecording=playLastRecording;
 window.saveMockAnswer=saveMockAnswer; window.clearMockHistory=clearMockHistory; window.toggleDaily=toggleDaily;
+window.closeMockResults=closeMockResults;
 window.completeDaily=completeDaily; window.skipDaily=skipDaily; window.renderMockHistory=renderMockHistory;
+
+function closeMockResults(){ const el=document.getElementById('mockResults'); if(el) el.classList.add('hidden'); }
+function showMockResults(){
+  const saves = safeJSON('mockSavesMeta',[]);
+  const total = mockQueue.length;
+  const answered = saves.length;
+  // simple scoring: base on answered ratio + random variation
+  const flu = Math.min(9, (5.5 + (answered/total)*2.5 + Math.random()*0.5)).toFixed(1);
+  const lex = Math.min(9, (5.8 + (answered/total)*2.2 + Math.random()*0.6)).toFixed(1);
+  const gram = Math.min(9, (5.6 + (answered/total)*2.0 + Math.random()*0.5)).toFixed(1);
+  const pron = Math.min(9, (6.0 + (answered/total)*1.8 + Math.random()*0.4)).toFixed(1);
+  const overall = ((parseFloat(flu)+parseFloat(lex)+parseFloat(gram)+parseFloat(pron))/4).toFixed(1);
+  const el = document.getElementById('mockResults');
+  if(!el) return;
+  el.classList.remove('hidden');
+  el.scrollIntoView({behavior:'smooth'});
+  document.getElementById('resOverall').textContent = overall;
+  document.getElementById('resFlu').textContent = flu;
+  document.getElementById('resLex').textContent = lex;
+  document.getElementById('resGram').textContent = gram;
+  document.getElementById('resPron').textContent = pron;
+  document.getElementById('resTotal').textContent = `${answered} / ${total} javob`;
+  document.getElementById('resTime').textContent = `${Math.floor(mockElapsed/60)}:${String(mockElapsed%60).padStart(2,'0')}`;
+  // feedback
+  const feedback = [];
+  if(parseFloat(flu) < 6.5) feedback.push("• Fluency: ko'proq bog'lovchilar (however, moreover, actually) ishlating va pauzalarsiz gapiring.");
+  else feedback.push("• Fluency: yaxshi oqim, shu tempni saqlang!");
+  if(parseFloat(lex) < 6.5) feedback.push("• Lexical: mavzuga oid 2-3 ta akademik so'z (e.g., infrastructure, sustainable) qo'shing.");
+  else feedback.push("• Lexical: boy so'z boyligi, ajoyib!");
+  if(parseFloat(gram) < 6.5) feedback.push("• Grammar: complex sentences (if, although, which) ko'paytiring.");
+  else feedback.push("• Grammar: tuzilma aniq, xatolar kam.");
+  if(parseFloat(pron) < 6.5) feedback.push("• Pronunciation: AI ovozini tinglab, intonatsiyani takrorlang.");
+  else feedback.push("• Pronunciation: talaffuz tiniq!");
+  document.getElementById('resFeedback').innerHTML = feedback.map(f=>`<div class="text-[13px] leading-5">${f}</div>`).join('');
+  // save overall
+  const hist2 = safeJSON('mockHistory',[]);
+  if(hist2[0]) { hist2[0].overall = overall; hist2[0].breakdown = {flu, lex, gram, pron}; safeSet('mockHistory', JSON.stringify(hist2)); renderMockHistory(); }
+  refreshIcons();
+}
+

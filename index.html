@@ -19,8 +19,8 @@ html.dark { color-scheme: dark; }
 .glass { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .hero-grid {
   background-image:
-    linear-gradient(rgba(15,23,42,.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15,23,42,.04) 1px, transparent 1px);
+    linear-gradient(rgba(46,14,78,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46,14,78,.06) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 .dark .hero-grid { background-image: linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px); }
@@ -29,9 +29,9 @@ html.dark { color-scheme: dark; }
 </style>
 <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-[#F8FAFC] dark:bg-[#0B1020] text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-amber-200">
+<body class="bg-[#F5F0FF] dark:bg-[#0F0A1E] text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-amber-200">
 <!-- TOP NAV -->
-<header class="sticky top-0 z-40 bg-white/80 dark:bg-[#0B1020]/80 glass border-b border-slate-200 dark:border-white/10">
+<header class="sticky top-0 z-40 bg-white/80 dark:bg-[#0F0A1E]/80 glass border-b border-slate-200 dark:border-white/10">
   <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
     <div class="h-[64px] flex items-center justify-between gap-4">
       <div class="flex items-center gap-6">
@@ -65,7 +65,7 @@ html.dark { color-scheme: dark; }
           <i data-lucide="settings-2" class="w-4 h-4"></i>
         </button>
         <button class="hidden sm:inline-flex items-center gap-2 bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-2 text-[13px] font-bold">
-          <span class="w-6 h-6 rounded-full bg-amber-400 grid place-items-center text-[#0F172A] text-[11px] font-extrabold">A</span> Akbar
+          <span class="w-6 h-6 rounded-full bg-amber-400 grid place-items-center text-[#0F172A] text-[11px] font-extrabold">Y</span> Yusuf
         </button>
         <button class="lg:hidden p-2" onclick="toggleMobileMenu()"><i data-lucide="menu" class="w-5 h-5"></i></button>
       </div>
@@ -89,7 +89,7 @@ html.dark { color-scheme: dark; }
 
 <!-- HERO -->
 <section id="view-home" class="view">
-  <div class="hero-grid border-b border-slate-200 dark:border-white/10 bg-gradient-to-b from-white to-[#F8FAFC] dark:from-[#0B1020] dark:to-[#0B1020]">
+  <div class="hero-grid border-b border-slate-200 dark:border-white/10 bg-gradient-to-b from-[#F5F0FF] via-[#EDE9FF] to-[#F5F3FF] dark:from-[#1A1040] dark:via-[#0F0A1E] dark:to-[#0F0A1E]">
     <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div class="grid lg:grid-cols-[1.15fr_.85fr] gap-8 items-start">
         <div>
@@ -105,9 +105,9 @@ html.dark { color-scheme: dark; }
           </h1>
           <p class="mt-4 text-[15px] sm:text-[16px] leading-6 text-slate-600 dark:text-slate-300 max-w-[640px]">Part 1 • Part 2 • Part 3 bloklariga ajratilgan <b>152 ta mavzu</b>, har birida <b>4 ta savol + Best Answer</b>, alohida <b>Mock Speaking</b>, <b>20 daqiqalik Daily Dars</b> va ikki AI ovoz (qiz & o'g'il bola) — hamma narsa bir joyda.</p>
           <div class="mt-6 flex flex-wrap gap-3">
-            <button onclick="router('part1')" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-6 py-3 text-[14px] font-bold inline-flex items-center gap-2 shadow-soft">Mavzularni boshlash <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
-            <button onclick="router('mock')" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-6 py-3 text-[14px] font-bold inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Mock ni sinab ko'rish</button>
-            <button onclick="router('daily')" class="bg-amber-400 text-slate-900 rounded-full px-6 py-3 text-[14px] font-extrabold inline-flex items-center gap-2">20' Daily Dars →</button>
+            <button onclick="router('part1')" class="bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-6 py-3 text-[14px] font-bold inline-flex items-center gap-2 shadow-soft dark:bg-emerald-500 dark:text-white">Mavzularni boshlash <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+            <button onclick="router('mock')" class="bg-sky-500 hover:bg-sky-600 text-white border border-sky-500 rounded-full px-6 py-3 text-[14px] font-bold inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> Mock ni sinab ko'rish</button>
+            <button onclick="router('daily')" class="bg-[#2E0E4E] hover:bg-[#1A0A2E] text-white rounded-full px-6 py-3 text-[14px] font-extrabold inline-flex items-center gap-2">20' Daily Dars →</button>
           </div>
           <div class="mt-6 flex flex-wrap items-center gap-3 text-[12px] font-semibold">
             <span class="inline-flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5"><span class="w-6 h-6 rounded-full bg-emerald-500 text-white grid place-items-center"><i data-lucide="check" class="w-3.5 h-3.5"></i></span> 608 × Best Answer</span>
@@ -190,7 +190,7 @@ html.dark { color-scheme: dark; }
               <div class="text-[12px] font-extrabold">20' Daily Dars</div>
               <div class="text-[11px] text-slate-500">Part 1+2+3 jamlanma</div>
             </div>
-            <div class="w-10 h-10 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin"></div>
+            <div class="w-10 h-10 rounded-full border-4 border-emerald-500"></div>
           </div>
         </div>
       </div>
@@ -200,9 +200,9 @@ html.dark { color-scheme: dark; }
   <!-- PART CARDS -->
   <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 -mt-4 relative z-10">
     <div class="grid md:grid-cols-3 gap-4">
-      <article class="group bg-white dark:bg-[#111A33] rounded-[20px] border border-slate-200 dark:border-white/10 p-5 shadow-card hover:shadow-soft transition cursor-pointer" onclick="router('part1')">
+      <article class="group bg-emerald-50 dark:bg-emerald-950/30 rounded-[20px] border border-emerald-200 dark:border-emerald-800 p-5 shadow-card hover:shadow-soft transition cursor-pointer" onclick="router('part1')">
         <div class="flex items-start justify-between">
-          <div class="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-500/15 text-sky-600 grid place-items-center text-xl">💬</div>
+          <div class="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 grid place-items-center text-xl">💬</div>
           <span class="text-[11px] font-extrabold tracking-wide bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-2.5 py-1 rounded-full">INTERVIEW • 4-5 min</span>
         </div>
         <h3 class="mt-4 font-extrabold text-[18px]">Part 1 — Introduction</h3>
@@ -212,11 +212,11 @@ html.dark { color-scheme: dark; }
         </div>
         <div class="mt-4 flex items-center gap-2 text-[13px] font-bold">Boshlash <span class="w-7 h-7 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center group-hover:translate-x-0.5 transition"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span></div>
       </article>
-      <article class="group bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 rounded-[20px] p-5 shadow-soft cursor-pointer relative overflow-hidden" onclick="router('part2')">
-        <div class="absolute inset-0 bg-gradient-to-br from-amber-400/20 to-transparent pointer-events-none"></div>
+      <article class="group bg-[#0EA5E9] dark:bg-sky-500 text-white rounded-[20px] p-5 shadow-soft cursor-pointer relative overflow-hidden" onclick="router('part2')">
+        <div class="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
         <div class="relative flex items-start justify-between">
-          <div class="w-12 h-12 rounded-2xl bg-white/15 dark:bg-slate-900/10 grid place-items-center text-xl">🗣️</div>
-          <span class="text-[11px] font-extrabold tracking-wide bg-amber-400 text-slate-900 px-2.5 py-1 rounded-full">CUE CARD • 2 min</span>
+          <div class="w-12 h-12 rounded-2xl bg-white/20 grid place-items-center text-xl">🗣️</div>
+          <span class="text-[11px] font-extrabold tracking-wide bg-white text-sky-600 px-2.5 py-1 rounded-full">CUE CARD • 2 min</span>
         </div>
         <h3 class="relative mt-4 font-extrabold text-[18px]">Part 2 — Long Turn</h3>
         <p class="relative text-[13px] leading-5 opacity-80 mt-1">77+ cue cards • 1 daqiqa tayyorgarlik + 2 daqiqa gapirish. Har biri 4 ta prompt + to'liq namuna.</p>
@@ -426,6 +426,64 @@ html.dark { color-scheme: dark; }
         <div class="h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden"><div id="mockOverallBar" class="h-full bg-[#0F172A] dark:bg-white transition-all" style="width:9%"></div></div>
       </div>
     </div>
+
+    <!-- MOCK RESULTS - Tekshiruv -->
+    <div id="mockResults" class="hidden mt-6 bg-white dark:bg-[#111A33] rounded-[24px] border border-slate-200 dark:border-white/10 shadow-soft overflow-hidden">
+      <div class="bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600 p-6 text-white relative overflow-hidden">
+        <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+        <div class="relative flex items-start justify-between gap-4">
+          <div>
+            <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide">✓ TEKSHIRILDI • AI BAHOLADI</div>
+            <h3 class="mt-3 font-extrabold text-[22px] leading-none">Mock Natijasi</h3>
+            <p class="text-[13px] opacity-90 mt-1">Barcha javoblaringiz tahlil qilindi — quyida har bir mezon bo'yicha baho va tavsiyalar</p>
+          </div>
+          <button onclick="closeMockResults()" class="hidden sm:grid w-9 h-9 rounded-full bg-white/20 place-items-center">✕</button>
+        </div>
+      </div>
+      <div class="p-6 grid md:grid-cols-[.9fr_1.1fr] gap-6">
+        <div class="bg-slate-50 dark:bg-white/5 rounded-2xl p-5 border border-slate-200 dark:border-white/10 text-center">
+          <div class="w-28 h-28 mx-auto rounded-full bg-gradient-to-br from-emerald-500 to-sky-600 grid place-items-center text-white shadow-lg">
+            <div>
+              <div id="resOverall" class="text-[36px] font-extrabold leading-none">7.2</div>
+              <div class="text-[10px] tracking-widest font-bold opacity-80">OVERALL BAND</div>
+            </div>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-2 text-left">
+            <div class="bg-white dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-white/10">
+              <div class="text-[10px] font-extrabold tracking-widest text-slate-500">FLUENCY</div>
+              <div id="resFlu" class="text-[18px] font-extrabold">7.0</div>
+            </div>
+            <div class="bg-white dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-white/10">
+              <div class="text-[10px] font-extrabold tracking-widest text-slate-500">LEXICAL</div>
+              <div id="resLex" class="text-[18px] font-extrabold">7.5</div>
+            </div>
+            <div class="bg-white dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-white/10">
+              <div class="text-[10px] font-extrabold tracking-widest text-slate-500">GRAMMAR</div>
+              <div id="resGram" class="text-[18px] font-extrabold">7.0</div>
+            </div>
+            <div class="bg-white dark:bg-white/5 rounded-xl p-3 border border-slate-200 dark:border-white/10">
+              <div class="text-[10px] font-extrabold tracking-widest text-slate-500">PRONUNCIATION</div>
+              <div id="resPron" class="text-[18px] font-extrabold">7.5</div>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center justify-center gap-3 text-[11px] font-bold">
+            <span id="resTotal" class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-2.5 py-1 rounded-full">8 / 11 javob</span>
+            <span id="resTime" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2.5 py-1 rounded-full">12:34</span>
+          </div>
+        </div>
+        <div>
+          <div class="text-[11px] font-extrabold tracking-widest text-slate-500">AI FEEDBACK & TAVSIYALAR</div>
+          <div id="resFeedback" class="mt-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 space-y-2"></div>
+          <div class="mt-4 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 text-[12px] leading-5">
+            <b>Keyingi qadam:</b> Kamroq bo'lgan mezonga e'tibor berib, shu mavzularni qayta mashq qiling. Har kuni 20' Daily ni o'tkazib yubormang!
+          </div>
+          <div class="mt-4 flex gap-2">
+            <button onclick="closeMockResults()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-5 py-2 text-[13px] font-bold">Yopish</button>
+            <button onclick="startMock()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-5 py-2 text-[13px] font-bold">Qayta topshirish →</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -484,7 +542,7 @@ html.dark { color-scheme: dark; }
 <!-- TOPIC MODAL -->
 <div id="topicModal" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeTopic()"></div>
-  <div class="absolute inset-0 sm:inset-4 lg:inset-8 bg-[#F8FAFC] dark:bg-[#0B1020] rounded-t-[20px] sm:rounded-[24px] shadow-2xl overflow-hidden flex flex-col">
+  <div class="absolute inset-0 sm:inset-4 lg:inset-8 bg-[#F5F0FF] dark:bg-[#0F0A1E] rounded-t-[20px] sm:rounded-[24px] shadow-2xl overflow-hidden flex flex-col">
     <div class="shrink-0 bg-white dark:bg-[#111A33] border-b border-slate-200 dark:border-white/10 px-4 sm:px-6 py-4 flex items-center gap-4">
       <div id="modalIcon" class="w-11 h-11 rounded-xl bg-slate-900 text-white grid place-items-center text-xl">💬</div>
       <div class="flex-1 min-w-0">
@@ -601,7 +659,7 @@ html.dark { color-scheme: dark; }
   </div>
 </div>
 
-<footer class="border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#0B1020] mt-10">
+<footer class="border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0A1E] mt-10">
   <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500">
       <div class="flex items-center gap-3">
