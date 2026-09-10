@@ -24,6 +24,7 @@ let recStart = 0;
 let recTimer = null;
 let lastBlob = null;
 let lastUrl = null;
+let mockSessionAnswered = 0;
 
 // daily
 let dailyInterval = null;
@@ -439,20 +440,45 @@ function stopAnyRecording(){
 }
 
 // MOCK
+function shuffleArray(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
 function buildMockQueue(){
-  // 6 from part1, 1 cue card from part2, 4 from part3 = 11
-  const p1 = [...DATA.part1].sort(()=>0.5-Math.random()).slice(0,6).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 1', badge:'PART 1', q:q.q, a:q.a, hint:q.tip, id:t.id})));
-  const p2topic = DATA.part2[Math.floor(Math.random()*DATA.part2.length)];
+  // avoid repeating last mock's questions
+  const lastIds = safeJSON('lastMockIds', []);
+  // 6 from part1, 1 cue card from part2, 4 from part3 = 11, shuffled properly
+  let p1Pool = shuffleArray(DATA.part1);
+  // filter out lastIds if possible
+  let p1Filtered = p1Pool.filter(t=>!lastIds.includes(t.id));
+  if(p1Filtered.length < 6) p1Filtered = p1Pool;
+  const p1 = p1Filtered.slice(0,6).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 1', badge:'PART 1', q:q.q, a:q.a, hint:q.tip, id:t.id})));
+  // Part2: pick cue card not in lastIds
+  let p2Pool = shuffleArray(DATA.part2);
+  let p2Filtered = p2Pool.filter(t=>!lastIds.includes(t.id));
+  const p2topic = (p2Filtered[0] || p2Pool[0]);
   const p2 = [{part:'Part 2', badge:'PART 2 • CUE CARD', q: `${p2topic.title}. ${p2topic.prompts.join('. ')}.`, a:p2topic.answer, hint:p2topic.tip, id:p2topic.id, isCue:true, prompts:p2topic.prompts, title:p2topic.title}];
-  const p3 = [...DATA.part3].sort(()=>0.5-Math.random()).slice(0,4).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 3', badge:'PART 3', q:q.q, a:q.a, hint:q.tip, id:t.id})));
-  return [...p1, ...p2, ...p3];
+  let p3Pool = shuffleArray(DATA.part3);
+  let p3Filtered = p3Pool.filter(t=>!lastIds.includes(t.id));
+  if(p3Filtered.length < 4) p3Filtered = p3Pool;
+  const p3 = p3Filtered.slice(0,4).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 3', badge:'PART 3', q:q.q, a:q.a, hint:q.tip, id:t.id})));
+  const queue = [...p1, ...p2, ...p3];
+  // save ids for next time
+  const ids = [...p1Filtered.slice(0,6).map(t=>t.id), p2topic.id, ...p3Filtered.slice(0,4).map(t=>t.id)];
+  safeSet('lastMockIds', JSON.stringify(ids));
+  return queue;
 }
 function startMock(){
   mockQueue=buildMockQueue();
   mockIndex=0;
   mockElapsed=0;
+  mockSessionAnswered=0;
   document.getElementById('mockRunner').classList.remove('hidden');
-  document.getElementById('mockRunner').scrollIntoView({behavior:'smooth'});
+  try{document.getElementById('mockRunner').scrollIntoView({behavior:'smooth'});}catch(e){}
   renderMockQuestion();
   startMockTimer();
   // save start to history
@@ -583,6 +609,7 @@ function saveMockAnswer(){
   const hist=safeJSON('mockHistory',[]);
   // update
   const done=parseInt(safeGet('mockDone')||'0')+1;
+  mockSessionAnswered++;
   safeSet('mockDone', String(done));
   updateMockStats();
   // download option
@@ -789,20 +816,33 @@ window.closeMockResults=closeMockResults;
 window.completeDaily=completeDaily; window.skipDaily=skipDaily; window.renderMockHistory=renderMockHistory;
 
 function closeMockResults(){ const el=document.getElementById('mockResults'); if(el) el.classList.add('hidden'); }
+function roundHalf(n){ return (Math.round(n*2)/2).toFixed(1); }
 function showMockResults(){
   const saves = safeJSON('mockSavesMeta',[]);
   const total = mockQueue.length;
-  const answered = saves.length;
-  // simple scoring: base on answered ratio + random variation
-  const flu = Math.min(9, (5.5 + (answered/total)*2.5 + Math.random()*0.5)).toFixed(1);
-  const lex = Math.min(9, (5.8 + (answered/total)*2.2 + Math.random()*0.6)).toFixed(1);
-  const gram = Math.min(9, (5.6 + (answered/total)*2.0 + Math.random()*0.5)).toFixed(1);
-  const pron = Math.min(9, (6.0 + (answered/total)*1.8 + Math.random()*0.4)).toFixed(1);
-  const overall = ((parseFloat(flu)+parseFloat(lex)+parseFloat(gram)+parseFloat(pron))/4).toFixed(1);
+  // count only saves from current mock session (use mockElapsed and last saves? For now use total saves but limit to total)
+  const answered = mockSessionAnswered; // per-mock session, resets each mock
+  // IELTS scoring: 0.5 increments, 0 if no answers
+  let flu, lex, gram, pron, overall;
+  const ratio = total ? answered/total : 0;
+  if(answered === 0){
+    flu = lex = gram = pron = overall = "0.0";
+  } else {
+    // base 4.0-7.5 depending on ratio, plus time bonus if mockElapsed reasonable (8-14 min)
+    const timeBonus = (mockElapsed >= 480 && mockElapsed <= 840) ? 0.5 : 0;
+    const base = 4.0 + ratio*3.5 + timeBonus; // 4.0 to 8.0
+    flu = roundHalf(Math.min(9, Math.max(4.0, base + (Math.random()-0.5)*0.8)));
+    lex = roundHalf(Math.min(9, Math.max(4.0, base + 0.2 + (Math.random()-0.5)*0.7)));
+    gram = roundHalf(Math.min(9, Math.max(4.0, base + (Math.random()-0.5)*0.7)));
+    pron = roundHalf(Math.min(9, Math.max(4.0, base + 0.3 + (Math.random()-0.5)*0.6)));
+    // IELTS overall is average, rounded to nearest 0.5 (0.25 up to 0.5, 0.75 up to next)
+    const avg = (parseFloat(flu)+parseFloat(lex)+parseFloat(gram)+parseFloat(pron))/4;
+    overall = roundHalf(avg);
+  }
   const el = document.getElementById('mockResults');
   if(!el) return;
   el.classList.remove('hidden');
-  el.scrollIntoView({behavior:'smooth'});
+  if(el.scrollIntoView) try{el.scrollIntoView({behavior:'smooth'});}catch(e){}
   document.getElementById('resOverall').textContent = overall;
   document.getElementById('resFlu').textContent = flu;
   document.getElementById('resLex').textContent = lex;
@@ -810,16 +850,22 @@ function showMockResults(){
   document.getElementById('resPron').textContent = pron;
   document.getElementById('resTotal').textContent = `${answered} / ${total} javob`;
   document.getElementById('resTime').textContent = `${Math.floor(mockElapsed/60)}:${String(mockElapsed%60).padStart(2,'0')}`;
-  // feedback
+  // feedback - handle 0 and realistic
   const feedback = [];
-  if(parseFloat(flu) < 6.5) feedback.push("• Fluency: ko'proq bog'lovchilar (however, moreover, actually) ishlating va pauzalarsiz gapiring.");
-  else feedback.push("• Fluency: yaxshi oqim, shu tempni saqlang!");
-  if(parseFloat(lex) < 6.5) feedback.push("• Lexical: mavzuga oid 2-3 ta akademik so'z (e.g., infrastructure, sustainable) qo'shing.");
-  else feedback.push("• Lexical: boy so'z boyligi, ajoyib!");
-  if(parseFloat(gram) < 6.5) feedback.push("• Grammar: complex sentences (if, although, which) ko'paytiring.");
-  else feedback.push("• Grammar: tuzilma aniq, xatolar kam.");
-  if(parseFloat(pron) < 6.5) feedback.push("• Pronunciation: AI ovozini tinglab, intonatsiyani takrorlang.");
-  else feedback.push("• Pronunciation: talaffuz tiniq!");
+  if(answered === 0){
+    feedback.push("• Hech bir savolga javob bermadingiz — Mock 0.0. Iltimos, har bir savolga kamida 20-30 soniya javob bering va Record bosing.");
+    feedback.push("• Maslahat: Part 1 da 1-2 gap, Part 2 da 1.5-2 daqiqa, Part 3 da 3-4 gap bilan to'liq javob bering.");
+  } else {
+    if(parseFloat(flu) < 6.0) feedback.push("• Fluency: ko'proq bog'lovchilar (however, moreover, actually) va pauzalarsiz gapiring. Har bir javobni 30-60 soniya cho'zing.");
+    else feedback.push("• Fluency: yaxshi oqim, shu tempni saqlang!");
+    if(parseFloat(lex) < 6.0) feedback.push("• Lexical: mavzuga oid 2-3 ta akademik so'z (e.g., infrastructure, sustainable, heritage) qo'shing.");
+    else feedback.push("• Lexical: boy so'z boyligi, ajoyib!");
+    if(parseFloat(gram) < 6.0) feedback.push("• Grammar: complex sentences (if, although, which, while) ko'paytiring.");
+    else feedback.push("• Grammar: tuzilma aniq, xatolar kam.");
+    if(parseFloat(pron) < 6.0) feedback.push("• Pronunciation: AI ovozini tinglab, intonatsiyani takrorlang, yozib o'zingizni tinglang.");
+    else feedback.push("• Pronunciation: talaffuz tiniq!");
+    if(ratio < 1) feedback.push(`• To'liqlik: ${answered}/${total} savolga javob berdingiz — barchasini javob bersangiz +1.0 ball ko'tariladi.`);
+  }
   document.getElementById('resFeedback').innerHTML = feedback.map(f=>`<div class="text-[13px] leading-5">${f}</div>`).join('');
   // save overall
   const hist2 = safeJSON('mockHistory',[]);
