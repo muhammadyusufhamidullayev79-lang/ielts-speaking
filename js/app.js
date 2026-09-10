@@ -30,7 +30,7 @@ let streak = parseInt(localStorage.getItem('streak')||'1');
 document.addEventListener('DOMContentLoaded', ()=>{
   initTheme();
   initVoiceUI();
-  lucide.createIcons();
+  refreshIcons();
   bindSearches();
   renderPreview();
   renderPart('part1');
@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   speechSynthesis.onvoiceschanged = ()=> {/* preload */};
 });
 
+function refreshIcons(){ if(window.lucide && window.lucide.createIcons) try{window.lucide.createIcons()}catch(e){} }
 function initTheme(){
   if(theme==='dark') document.documentElement.classList.add('dark');
   else document.documentElement.classList.remove('dark');
@@ -56,7 +57,7 @@ function initTheme(){
 function toggleTheme(){ setTheme(theme==='dark'?'light':'dark'); }
 function setTheme(t){
   theme=t; localStorage.setItem('theme',t);
-  initTheme(); lucide.createIcons();
+  initTheme(); refreshIcons();
 }
 
 function initVoiceUI(){
@@ -123,7 +124,7 @@ function router(view){
   if(active) active.classList.add('bg-slate-900','text-white','dark:bg-white','dark:text-slate-900');
   window.scrollTo({top:0, behavior:'smooth'});
   if(view==='part1'||view==='part2'||view==='part3') renderPart(view);
-  lucide.createIcons();
+  refreshIcons();
 }
 function toggleMobileMenu(){
   const m=document.getElementById('mobileMenu');
@@ -181,7 +182,7 @@ function renderPreview(){
   const grid=document.getElementById('previewGrid');
   grid.innerHTML = list.slice(0,previewLimit).map(t=> cardHTML(t,currentPreviewTab)).join('') || `<div class="col-span-full text-center py-10 text-slate-500">Hech narsa topilmadi. Boshqa so'z bilan urinib ko'ring.</div>`;
   document.getElementById('previewMoreBtn').style.display = list.length>previewLimit ? 'inline-flex' : 'none';
-  lucide.createIcons();
+  refreshIcons();
 }
 function renderPart(part){
   const q=(document.getElementById(`search-${part}`)?.value||'').toLowerCase();
@@ -197,7 +198,7 @@ function renderPart(part){
     }
   }
   grid.innerHTML = list.slice(0, 80).map(t=> cardHTML(t,part)).join('') || `<div class="col-span-full text-center py-10 text-slate-500">Hech narsa topilmadi</div>`;
-  lucide.createIcons();
+  refreshIcons();
 }
 let part2Cat='all';
 function filterPart2(cat){
@@ -210,7 +211,7 @@ function filterPart2(cat){
   const q=(document.getElementById('search-part2')?.value||'').toLowerCase();
   const filtered = q ? list.filter(t=> (t.title+t.questions.map(x=>x.q).join(' ')).toLowerCase().includes(q)) : list;
   grid.innerHTML = filtered.slice(0,80).map(t=>cardHTML(t,'part2')).join('');
-  lucide.createIcons();
+  refreshIcons();
 }
 
 function cardHTML(t, part){
@@ -313,7 +314,7 @@ function openTopic(id){
   }
   document.getElementById('topicModal').classList.remove('hidden');
   document.body.style.overflow='hidden';
-  lucide.createIcons();
+  refreshIcons();
   if(autoPlay){
     setTimeout(()=> {
       if(t.id.startsWith('p2')) speak(`${t.title}. ${t.prompts.join('. ')}`, voicePref);
@@ -353,7 +354,7 @@ async function toggleRecForQuestion(idx){
     qRecState[idx].recorder.stop();
     qRecState[idx].recording=false;
     btn.innerHTML=`<i data-lucide="mic" class="w-3.5 h-3.5"></i> Yozish`;
-    lucide.createIcons();
+    refreshIcons();
     return;
   }
   try{
@@ -378,7 +379,7 @@ async function toggleRecForQuestion(idx){
       const sec=Math.floor((Date.now()-qRecState[idx].start)/1000);
       bar.style.width=Math.min(100, sec*3)+'%';
     },200);
-    lucide.createIcons();
+    refreshIcons();
   }catch(e){ alert('Mikrofonga ruxsat bering: '+e.message); }
 }
 function saveQRecording(topicId, qIdx, blob){
@@ -480,7 +481,7 @@ function renderMockQuestion(){
       <audio src="${s.url}" controls class="w-24 h-7"></audio>
     </div>
   `).join('') || `<div class="text-[11px] text-slate-500 text-center py-2">Hali javob saqlanmadi — Record bosing</div>`;
-  lucide.createIcons();
+  refreshIcons();
   if(autoPlay) setTimeout(()=> playMockQuestion(), 400);
 }
 function playMockQuestion(force){
@@ -490,7 +491,7 @@ function playMockQuestion(force){
   btn.innerHTML=`<span class="w-3 h-3 rounded-full bg-white animate-pulse"></span> Eshitilmoqda...`;
   speak(item.q, voicePref, ()=>{
     btn.innerHTML=`<i data-lucide="volume-2" class="w-4 h-4"></i> Savolni eshitish`;
-    lucide.createIcons();
+    refreshIcons();
   });
 }
 function nextMockQuestion(){
@@ -606,7 +607,7 @@ function renderMockHistory(){
       <span class="text-[11px] font-bold bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full">${meta.length} javob</span>
     </div>
   `).join('');
-  lucide.createIcons();
+  refreshIcons();
   document.getElementById('mockStatsDone').textContent = meta.length || localStorage.getItem('mockDone')||'0';
 }
 function clearMockHistory(){
@@ -698,7 +699,7 @@ function renderDaily(){
       </div>
     </div>
   `;
-  lucide.createIcons();
+  refreshIcons();
   // history
   const hist=JSON.parse(localStorage.getItem('dailyHistory')||'[]');
   document.getElementById('dailyHistory').innerHTML = hist.slice(0,5).map(h=>`
@@ -766,7 +767,7 @@ function skipDaily(){
 }
 
 // SETTINGS modal
-function openSettings(){ document.getElementById('settingsModal').classList.remove('hidden'); document.body.style.overflow='hidden'; lucide.createIcons(); }
+function openSettings(){ document.getElementById('settingsModal').classList.remove('hidden'); document.body.style.overflow='hidden'; refreshIcons(); }
 function closeSettings(){ document.getElementById('settingsModal').classList.add('hidden'); document.body.style.overflow=''; saveSettings(); }
 
 window.router=router; window.toggleTheme=toggleTheme; window.setTheme=setTheme; window.doGlobalSearch=doGlobalSearch;
