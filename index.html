@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="uz" class="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IELTS Speaking Pro — 9.0 sari professional tayyorgarlik</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Plus Jakarta Sans','system-ui','sans-serif'],
+        serif: ['Instrument Serif','serif'],
+        mono: ['JetBrains Mono','monospace']
+      },
+      colors: {
+        primary: '#0F172A',
+        accent: '#FF3B30',
+        gold: '#FFB800',
+        paper: '#FFFBF0',
+      },
+      boxShadow: {
+        soft: '0 10px 40px -10px rgba(15,23,42,.12)',
+        card: '0 4px 24px rgba(15,23,42,.06)',
+      }
+    }
+  }
+}
+</script>
+<style>
+:root { color-scheme: light; }
+html.dark { color-scheme: dark; }
+* { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
+::-webkit-scrollbar { width:6px; height:6px }
+::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:999px }
+.dark ::-webkit-scrollbar-thumb { background:#334155 }
+.glass { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(15,23,42,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,23,42,.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.dark .hero-grid { background-image: linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px); }
+.range::-webkit-slider-thumb { appearance:none; width:18px; height:18px; border-radius:50%; background:#0F172A; border:3px solid white; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+.dark .range::-webkit-slider-thumb { background:white; border-color:#0F172A }
+</style>
+<script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-[#F8FAFC] dark:bg-[#0B1020] text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-amber-200">
+<!-- TOP NAV -->
+<header class="sticky top-0 z-40 bg-white/80 dark:bg-[#0B1020]/80 glass border-b border-slate-200 dark:border-white/10">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="h-[64px] flex items-center justify-between gap-4">
+      <div class="flex items-center gap-6">
+        <a href="#" class="flex items-center gap-3" onclick="router('home');return false">
+          <div class="w-9 h-9 rounded-xl bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] grid place-items-center font-extrabold tracking-tighter text-[13px]">9.0</div>
+          <div class="leading-none">
+            <div class="font-extrabold tracking-tight text-[15px]">IELTS SPEAKING</div>
+            <div class="text-[10px] tracking-[0.18em] font-bold text-slate-500 dark:text-slate-400 -mt-0.5">PRO • UZBEKISTAN</div>
+          </div>
+          <span class="hidden sm:inline-flex ml-2 px-2.5 py-1 rounded-full bg-amber-400 text-[#0F172A] text-[11px] font-extrabold tracking-wide">NEW 2026</span>
+        </a>
+        <nav class="hidden lg:flex items-center gap-1 ml-2">
+          <button onclick="router('part1')" data-nav="part1" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">Part 1 <span class="ml-1 text-[11px] bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-1.5 py-0.5 rounded-full">35+</span></button>
+          <button onclick="router('part2')" data-nav="part2" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">Part 2 <span class="ml-1 text-[11px] bg-amber-400 text-slate-900 px-1.5 py-0.5 rounded-full">77+</span></button>
+          <button onclick="router('part3')" data-nav="part3" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">Part 3 <span class="ml-1 text-[11px] bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-1.5 py-0.5 rounded-full">40+</span></button>
+          <button onclick="router('mock')" data-nav="mock" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>Mock</button>
+          <button onclick="router('daily')" data-nav="daily" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">20' Daily</button>
+        </nav>
+      </div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-white/10 rounded-full pl-3 pr-1 py-1 border border-slate-200 dark:border-white/10">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+          <input id="globalSearch" placeholder="Mavzu qidirish — masalan, hometown, music..." class="bg-transparent outline-none text-[13px] w-[260px] placeholder:text-slate-400">
+          <button onclick="doGlobalSearch()" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full w-7 h-7 grid place-items-center"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
+        </div>
+        <button onclick="toggleTheme()" class="w-9 h-9 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 grid place-items-center hover:scale-105 transition">
+          <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+          <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+        </button>
+        <button onclick="openSettings()" class="w-9 h-9 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 grid place-items-center">
+          <i data-lucide="settings-2" class="w-4 h-4"></i>
+        </button>
+        <button class="hidden sm:inline-flex items-center gap-2 bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-2 text-[13px] font-bold">
+          <span class="w-6 h-6 rounded-full bg-amber-400 grid place-items-center text-[#0F172A] text-[11px] font-extrabold">A</span> Akbar
+        </button>
+        <button class="lg:hidden p-2" onclick="toggleMobileMenu()"><i data-lucide="menu" class="w-5 h-5"></i></button>
+      </div>
+    </div>
+    <div id="mobileMenu" class="hidden lg:hidden pb-4 flex-col gap-2">
+      <div class="flex gap-2 overflow-auto pb-2">
+        <button onclick="router('part1')" class="px-4 py-2 rounded-full bg-slate-900 text-white text-sm whitespace-nowrap">Part 1 • 35+</button>
+        <button onclick="router('part2')" class="px-4 py-2 rounded-full bg-amber-400 text-slate-900 text-sm whitespace-nowrap">Part 2 • 77+</button>
+        <button onclick="router('part3')" class="px-4 py-2 rounded-full bg-white border text-sm whitespace-nowrap">Part 3 • 40+</button>
+        <button onclick="router('mock')" class="px-4 py-2 rounded-full bg-red-500 text-white text-sm whitespace-nowrap">Mock</button>
+        <button onclick="router('daily')" class="px-4 py-2 rounded-full bg-white border text-sm whitespace-nowrap">20' Daily</button>
+      </div>
+      <div class="flex items-center gap-2 bg-slate-100 dark:bg-white/10 rounded-2xl px-3 py-2">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+        <input id="globalSearchM" placeholder="Mavzu qidirish..." class="bg-transparent outline-none text-sm flex-1">
+        <button onclick="document.getElementById('globalSearch').value=document.getElementById('globalSearchM').value;doGlobalSearch()" class="bg-slate-900 text-white rounded-full px-3 py-1 text-sm">Qidirish</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section id="view-home" class="view">
+  <div class="hero-grid border-b border-slate-200 dark:border-white/10 bg-gradient-to-b from-white to-[#F8FAFC] dark:from-[#0B1020] dark:to-[#0B1020]">
+    <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+      <div class="grid lg:grid-cols-[1.15fr_.85fr] gap-8 items-start">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full pl-1 pr-3 py-1 shadow-sm">
+            <span class="bg-emerald-500 text-white text-[11px] font-extrabold tracking-wide px-2.5 py-1 rounded-full">NEW</span>
+            <span class="text-[13px] font-medium">Har mavzu — 4 savol + Band 9 Best Answer + Audio</span>
+            <span class="hidden sm:inline-flex w-6 h-6 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 place-items-center grid"><i data-lucide="sparkles" class="w-3 h-3"></i></span>
+          </div>
+          <h1 class="mt-5 font-serif text-[36px] sm:text-[48px] lg:text-[56px] leading-[0.95] tracking-tight">
+            IELTS Speaking <br>
+            <span class="italic font-light">9.0 uchun</span> <span class="bg-amber-400 px-2 rounded-[10px]">professional</span><br>
+            tayyorgarlik
+          </h1>
+          <p class="mt-4 text-[15px] sm:text-[16px] leading-6 text-slate-600 dark:text-slate-300 max-w-[640px]">Part 1 • Part 2 • Part 3 bloklariga ajratilgan <b>152 ta mavzu</b>, har birida <b>4 ta savol + Best Answer</b>, alohida <b>Mock Speaking</b>, <b>20 daqiqalik Daily Dars</b> va ikki AI ovoz (qiz & o'g'il bola) — hamma narsa bir joyda.</p>
+          <div class="mt-6 flex flex-wrap gap-3">
+            <button onclick="router('part1')" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-6 py-3 text-[14px] font-bold inline-flex items-center gap-2 shadow-soft">Mavzularni boshlash <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+            <button onclick="router('mock')" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-6 py-3 text-[14px] font-bold inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Mock ni sinab ko'rish</button>
+            <button onclick="router('daily')" class="bg-amber-400 text-slate-900 rounded-full px-6 py-3 text-[14px] font-extrabold inline-flex items-center gap-2">20' Daily Dars →</button>
+          </div>
+          <div class="mt-6 flex flex-wrap items-center gap-3 text-[12px] font-semibold">
+            <span class="inline-flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5"><span class="w-6 h-6 rounded-full bg-emerald-500 text-white grid place-items-center"><i data-lucide="check" class="w-3.5 h-3.5"></i></span> 608 × Best Answer</span>
+            <span class="inline-flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5"><i data-lucide="mic" class="w-4 h-4"></i> Audio + Voice Record</span>
+            <span class="inline-flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5"><i data-lucide="bookmark-check" class="w-4 h-4"></i> Natijalar saqlanadi</span>
+          </div>
+          <div class="mt-8 grid grid-cols-3 gap-3 max-w-[520px]">
+            <div class="bg-white dark:bg-white/[0.06] border border-slate-200 dark:border-white/10 rounded-2xl p-4">
+              <div class="text-[11px] tracking-widest font-extrabold text-slate-500">PART 1</div>
+              <div class="text-[28px] font-extrabold leading-none mt-1">35+</div>
+              <div class="text-[12px] text-slate-500">mavzu • 140 savol</div>
+            </div>
+            <div class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-2xl p-4">
+              <div class="text-[11px] tracking-widest font-extrabold opacity-70">PART 2</div>
+              <div class="text-[28px] font-extrabold leading-none mt-1">77+</div>
+              <div class="text-[12px] opacity-70">cue cards • 308 savol</div>
+            </div>
+            <div class="bg-amber-400 text-slate-900 rounded-2xl p-4">
+              <div class="text-[11px] tracking-widest font-extrabold opacity-70">PART 3</div>
+              <div class="text-[28px] font-extrabold leading-none mt-1">40+</div>
+              <div class="text-[12px] opacity-70">mavzu • 160 savol</div>
+            </div>
+          </div>
+        </div>
+        <!-- RIGHT PREVIEW CARD -->
+        <div class="relative">
+          <div class="bg-white dark:bg-[#111A33] rounded-[24px] shadow-soft border border-slate-200 dark:border-white/10 overflow-hidden">
+            <div class="h-2 bg-gradient-to-r from-amber-400 via-red-500 to-indigo-600"></div>
+            <div class="p-5 sm:p-6">
+              <div class="flex items-center justify-between">
+                <div class="text-[11px] tracking-[0.14em] font-extrabold text-slate-500">TODAY'S PICK • BAND 9</div>
+                <span class="text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 px-2.5 py-1 rounded-full">● LIVE AUDIO</span>
+              </div>
+              <h3 class="mt-3 font-serif text-[22px] leading-tight">Describe a person who taught you something important</h3>
+              <p class="text-[13px] text-slate-500 mt-1">Part 2 • Cue Card #01 • 2 minutes</p>
+              <div class="mt-4 bg-slate-50 dark:bg-white/5 rounded-2xl p-4 border border-slate-200 dark:border-white/10">
+                <div class="flex items-center gap-3">
+                  <img id="heroVoiceAvatar" src="https://i.pravatar.cc/100?img=5" class="w-9 h-9 rounded-full object-cover">
+                  <div class="flex-1">
+                    <div class="text-[13px] font-bold flex items-center gap-2"><span id="heroVoiceName">Dilnoza • Qiz bola</span> <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span></div>
+                    <div class="text-[11px] text-slate-500">AI ovozida savolni eshitish</div>
+                  </div>
+                  <button onclick="playHeroAudio()" class="w-10 h-10 rounded-full bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] grid place-items-center shadow"><i data-lucide="play" class="w-4 h-4 fill-current"></i></button>
+                </div>
+                <div class="mt-3 flex items-center gap-2">
+                  <div class="flex-1 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden"><div id="heroProgress" class="h-full w-[36%] bg-[#0F172A] dark:bg-white rounded-full"></div></div>
+                  <span class="text-[11px] font-mono">0:24 / 1:08</span>
+                </div>
+              </div>
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <div class="rounded-2xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-3">
+                  <div class="text-[11px] font-extrabold tracking-wide">BEST ANSWER</div>
+                  <div class="text-[12px] leading-5 mt-1 line-clamp-3 text-slate-700 dark:text-slate-200">I'd like to talk about my high-school physics teacher, Mr. Karimov, who not only taught me formulas but taught me how to think...</div>
+                  <button onclick="router('part2')" class="mt-2 text-[12px] font-bold underline">To'liq o'qish →</button>
+                </div>
+                <div class="rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-3 flex flex-col justify-between">
+                  <div>
+                    <div class="text-[11px] font-extrabold tracking-wide opacity-70">MOCK SCORE</div>
+                    <div class="text-[32px] font-extrabold leading-none mt-1">7.5</div>
+                    <div class="text-[11px] opacity-70">Fluency 7 • Lexical 8 • Grammar 7 • Pronunciation 8</div>
+                  </div>
+                  <button onclick="router('mock')" class="mt-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-full py-1.5 text-[12px] font-bold">Mock boshlash</button>
+                </div>
+              </div>
+            </div>
+            <div class="px-6 py-4 bg-slate-50 dark:bg-white/5 border-t border-slate-200 dark:border-white/10 flex items-center justify-between">
+              <div class="flex -space-x-2">
+                <img src="https://i.pravatar.cc/100?img=12" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
+                <img src="https://i.pravatar.cc/100?img=32" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
+                <img src="https://i.pravatar.cc/100?img=15" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
+                <div class="w-7 h-7 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center text-[10px] font-bold border-2 border-white">+2k</div>
+              </div>
+              <div class="text-[12px] font-medium text-slate-600 dark:text-slate-300">2,847 o'quvchi bugun mashq qildi</div>
+            </div>
+          </div>
+          <!-- floating badge -->
+          <div class="hidden sm:flex absolute -right-3 -bottom-4 bg-white dark:bg-[#111A33] rounded-2xl shadow-soft border border-slate-200 dark:border-white/10 p-3 items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500 grid place-items-center text-white"><i data-lucide="timer" class="w-5 h-5"></i></div>
+            <div>
+              <div class="text-[12px] font-extrabold">20' Daily Dars</div>
+              <div class="text-[11px] text-slate-500">Part 1+2+3 jamlanma</div>
+            </div>
+            <div class="w-10 h-10 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PART CARDS -->
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 -mt-4 relative z-10">
+    <div class="grid md:grid-cols-3 gap-4">
+      <article class="group bg-white dark:bg-[#111A33] rounded-[20px] border border-slate-200 dark:border-white/10 p-5 shadow-card hover:shadow-soft transition cursor-pointer" onclick="router('part1')">
+        <div class="flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-500/15 text-sky-600 grid place-items-center text-xl">💬</div>
+          <span class="text-[11px] font-extrabold tracking-wide bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-2.5 py-1 rounded-full">INTERVIEW • 4-5 min</span>
+        </div>
+        <h3 class="mt-4 font-extrabold text-[18px]">Part 1 — Introduction</h3>
+        <p class="text-[13px] leading-5 text-slate-600 dark:text-slate-300 mt-1">35+ mavzu • Tanish mavzular: hometown, work, hobbies, daily life. Har biri 4 savol + Band 9 javob.</p>
+        <div class="mt-4 flex flex-wrap gap-1.5">
+          <span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">Hometown</span><span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">Music</span><span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">Food</span><span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">+32</span>
+        </div>
+        <div class="mt-4 flex items-center gap-2 text-[13px] font-bold">Boshlash <span class="w-7 h-7 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center group-hover:translate-x-0.5 transition"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span></div>
+      </article>
+      <article class="group bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 rounded-[20px] p-5 shadow-soft cursor-pointer relative overflow-hidden" onclick="router('part2')">
+        <div class="absolute inset-0 bg-gradient-to-br from-amber-400/20 to-transparent pointer-events-none"></div>
+        <div class="relative flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-white/15 dark:bg-slate-900/10 grid place-items-center text-xl">🗣️</div>
+          <span class="text-[11px] font-extrabold tracking-wide bg-amber-400 text-slate-900 px-2.5 py-1 rounded-full">CUE CARD • 2 min</span>
+        </div>
+        <h3 class="relative mt-4 font-extrabold text-[18px]">Part 2 — Long Turn</h3>
+        <p class="relative text-[13px] leading-5 opacity-80 mt-1">77+ cue cards • 1 daqiqa tayyorgarlik + 2 daqiqa gapirish. Har biri 4 ta prompt + to'liq namuna.</p>
+        <div class="relative mt-4 flex flex-wrap gap-1.5">
+          <span class="text-[11px] bg-white/15 dark:bg-slate-900/10 px-2 py-1 rounded-full">Person</span><span class="text-[11px] bg-white/15 dark:bg-slate-900/10 px-2 py-1 rounded-full">Place</span><span class="text-[11px] bg-white/15 dark:bg-slate-900/10 px-2 py-1 rounded-full">Event</span><span class="text-[11px] bg-white/15 dark:bg-slate-900/10 px-2 py-1 rounded-full">+74</span>
+        </div>
+        <div class="relative mt-4 flex items-center gap-2 text-[13px] font-bold">Cue cardlar <span class="w-7 h-7 rounded-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white grid place-items-center"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span></div>
+      </article>
+      <article class="group bg-white dark:bg-[#111A33] rounded-[20px] border border-slate-200 dark:border-white/10 p-5 shadow-card hover:shadow-soft transition cursor-pointer" onclick="router('part3')">
+        <div class="flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 grid place-items-center text-xl">🎓</div>
+          <span class="text-[11px] font-extrabold tracking-wide bg-amber-400 text-slate-900 px-2.5 py-1 rounded-full">DISCUSSION • 4-5 min</span>
+        </div>
+        <h3 class="mt-4 font-extrabold text-[18px]">Part 3 — Discussion</h3>
+        <p class="text-[13px] leading-5 text-slate-600 dark:text-slate-300 mt-1">40+ chuqur mavzu • Abstract savollar: society, technology, environment. Har biri 4 savol + Band 9 javob.</p>
+        <div class="mt-4 flex flex-wrap gap-1.5">
+          <span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">Education</span><span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">Technology</span><span class="text-[11px] bg-slate-100 dark:bg-white/10 px-2 py-1 rounded-full">+38</span>
+        </div>
+        <div class="mt-4 flex items-center gap-2 text-[13px] font-bold">Muhokama <span class="w-7 h-7 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span></div>
+      </article>
+    </div>
+  </div>
+
+  <!-- SEARCH + TOPICS PREVIEW -->
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div>
+        <h2 class="font-extrabold text-[22px] tracking-tight">Barcha mavzular — qidirish bilan</h2>
+        <p class="text-[13px] text-slate-500 dark:text-slate-400 mt-1">Part ichidagi qidirish: mavzu nomi, savol yoki so'z bo'yicha topish</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="setPreviewTab('part1')" id="prevTab-part1" class="prevTab px-4 py-2 rounded-full bg-slate-900 text-white text-[13px] font-bold">Part 1</button>
+        <button onclick="setPreviewTab('part2')" id="prevTab-part2" class="prevTab px-4 py-2 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[13px] font-bold">Part 2</button>
+        <button onclick="setPreviewTab('part3')" id="prevTab-part3" class="prevTab px-4 py-2 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[13px] font-bold">Part 3</button>
+      </div>
+    </div>
+    <div class="mt-4 flex gap-3">
+      <div class="flex-1 flex items-center gap-3 bg-white dark:bg-[#111A33] border border-slate-200 dark:border-white/10 rounded-full px-4 py-2.5 shadow-sm">
+        <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+        <input id="previewSearch" oninput="renderPreview()" placeholder="Masalan: travel, education,Describe a book..." class="flex-1 bg-transparent outline-none text-[14px] placeholder:text-slate-400">
+        <span id="previewCount" class="text-[12px] font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-2.5 py-1 rounded-full">35</span>
+      </div>
+      <button onclick="document.getElementById('previewSearch').value='';renderPreview()" class="hidden sm:inline-flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-2.5 text-[13px] font-bold">Tozalash</button>
+    </div>
+    <div id="previewGrid" class="mt-5 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+    <div class="mt-6 text-center">
+      <button id="previewMoreBtn" onclick="previewMore()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-6 py-2.5 text-[13px] font-bold">Yana ko'rsatish ↓</button>
+    </div>
+  </div>
+</section>
+
+<!-- PART VIEWS -->
+<section id="view-part1" class="view hidden">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="w-10 h-10 rounded-xl bg-sky-500 text-white grid place-items-center"><i data-lucide="message-circle" class="w-5 h-5"></i></span>
+      <div>
+        <h1 class="font-extrabold text-[24px] leading-none">Part 1 <span class="font-serif font-normal italic text-slate-500">— Introduction & Interview</span></h1>
+        <p class="text-[13px] text-slate-500">35+ mavzu • Har birida 4 savol + Best Answer • Audio bilan</p>
+      </div>
+      <div class="ml-auto flex gap-2">
+        <div class="flex items-center gap-2 bg-white dark:bg-[#111A33] border border-slate-200 dark:border-white/10 rounded-full px-3 py-2">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+          <input id="search-part1" oninput="renderPart('part1')" placeholder="Part 1 da qidirish..." class="bg-transparent outline-none text-[13px] w-[200px]">
+        </div>
+      </div>
+    </div>
+    <div id="grid-part1" class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+  </div>
+</section>
+<section id="view-part2" class="view hidden">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="w-10 h-10 rounded-xl bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 grid place-items-center">2</span>
+      <div>
+        <h1 class="font-extrabold text-[24px] leading-none">Part 2 <span class="font-serif font-normal italic text-slate-500">— Cue Cards</span></h1>
+        <p class="text-[13px] text-slate-500">77+ cue card • 1 min prep + 2 min talk • 4 prompts + to'liq javob</p>
+      </div>
+      <div class="ml-auto flex gap-2">
+        <div class="flex items-center gap-2 bg-white dark:bg-[#111A33] border border-slate-200 dark:border-white/10 rounded-full px-3 py-2">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+          <input id="search-part2" oninput="renderPart('part2')" placeholder="Cue card qidirish..." class="bg-transparent outline-none text-[13px] w-[220px]">
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-4 overflow-auto pb-2" id="part2Filters"></div>
+    <div id="grid-part2" class="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  </div>
+</section>
+<section id="view-part3" class="view hidden">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="w-10 h-10 rounded-xl bg-amber-400 text-slate-900 grid place-items-center"><i data-lucide="graduation-cap" class="w-5 h-5"></i></span>
+      <div>
+        <h1 class="font-extrabold text-[24px] leading-none">Part 3 <span class="font-serif font-normal italic text-slate-500">— Discussion</span></h1>
+        <p class="text-[13px] text-slate-500">40+ mavzu • Abstract & analytical savollar • Band 8-9 javoblar</p>
+      </div>
+      <div class="ml-auto flex gap-2">
+        <div class="flex items-center gap-2 bg-white dark:bg-[#111A33] border border-slate-200 dark:border-white/10 rounded-full px-3 py-2">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+          <input id="search-part3" oninput="renderPart('part3')" placeholder="Part 3 mavzu qidirish..." class="bg-transparent outline-none text-[13px] w-[200px]">
+        </div>
+      </div>
+    </div>
+    <div id="grid-part3" class="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+  </div>
+</section>
+
+<!-- MOCK -->
+<section id="view-mock" class="view hidden">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="bg-gradient-to-br from-[#0F172A] to-[#1E293B] dark:from-[#111A33] dark:to-[#0B1020] rounded-[28px] p-6 sm:p-8 text-white relative overflow-hidden">
+      <div class="absolute -right-20 -top-20 w-72 h-72 bg-amber-400/20 rounded-full blur-3xl"></div>
+      <div class="relative grid lg:grid-cols-[1.2fr_.8fr] gap-8 items-center">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> SPEAKING MOCK TEST • REAL EXAM SIMULATION</div>
+          <h1 class="mt-4 font-serif text-[32px] sm:text-[40px] leading-[0.95]">Haqiqiy imtihon <br><span class="italic font-light">kabi</span> <span class="bg-amber-400 text-slate-900 px-2 rounded-xl">Mock</span></h1>
+          <p class="mt-3 text-[14px] leading-6 text-white/80 max-w-[560px]">Savollar audio tizimda o'qiladi, siz mikrofonda javob berasiz. Har bir javobingiz saqlanadi — keyin tinglab, o'zingizni baholay olasiz. Fluency, Lexical, Grammar bo'yicha avtomatik eslatmalar.</p>
+          <div class="mt-6 flex flex-wrap gap-3">
+            <button onclick="startMock()" class="bg-amber-400 text-slate-900 rounded-full px-7 py-3 font-extrabold text-[14px] inline-flex items-center gap-2">Mock ni boshlash <i data-lucide="mic" class="w-4 h-4"></i></button>
+            <button onclick="openSettings()" class="bg-white/10 backdrop-blur border border-white/20 rounded-full px-6 py-3 font-bold text-[14px] inline-flex items-center gap-2"><i data-lucide="settings-2" class="w-4 h-4"></i> Ovozni tanlash</button>
+          </div>
+          <div class="mt-6 flex gap-6 text-[12px]">
+            <div><div class="font-mono text-[20px] font-bold" id="mockStatsTotal">608</div><div class="opacity-70">savollar banki</div></div>
+            <div><div class="font-mono text-[20px] font-bold" id="mockStatsDone">0</div><div class="opacity-70">siz bajardingiz</div></div>
+            <div><div class="font-mono text-[20px] font-bold">11-14 min</div><div class="opacity-70">davomiylik</div></div>
+          </div>
+        </div>
+        <div class="bg-white text-slate-900 dark:bg-[#1B2540] dark:text-white rounded-[20px] p-5 shadow-soft">
+          <div class="flex items-center justify-between">
+            <div class="text-[11px] font-extrabold tracking-widest opacity-60">MOCK HISTORY</div>
+            <button onclick="clearMockHistory()" class="text-[11px] font-bold underline opacity-60">Tozalash</button>
+          </div>
+          <div id="mockHistory" class="mt-3 space-y-2 max-h-[260px] overflow-auto pr-1"></div>
+          <div class="mt-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+            <div class="text-[12px] font-bold flex items-center gap-2"><i data-lucide="info" class="w-3.5 h-3.5"></i> Qanday ishlaydi?</div>
+            <ol class="text-[12px] leading-5 mt-1 list-decimal list-inside opacity-80">
+              <li>Savol avtomatik o'qiladi (AI ovoz)</li>
+              <li>“Record” tugmasini bosing va javob bering</li>
+              <li>To'xtating — yozuv saqlanadi va tinglashingiz mumkin</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOCK RUNNER -->
+    <div id="mockRunner" class="hidden mt-6 bg-white dark:bg-[#111A33] rounded-[24px] border border-slate-200 dark:border-white/10 shadow-soft overflow-hidden">
+      <div class="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5 border-b border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.03]">
+        <div class="flex items-center gap-3">
+          <span class="w-9 h-9 rounded-full bg-red-500 text-white grid place-items-center animate-pulse"><i data-lucide="mic" class="w-4 h-4"></i></span>
+          <div>
+            <div class="text-[13px] font-extrabold">Mock — <span id="mockPartLabel">Part 1</span> <span class="font-mono text-slate-500">•</span> <span id="mockProgressLabel" class="font-mono text-[12px]">1 / 11</span></div>
+            <div class="text-[12px] text-slate-500">Savol audio bilan o'qiladi — keyin javobni yozib oling</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="hidden sm:flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span class="text-[12px] font-mono font-bold" id="mockTimer">00:00</span>
+            <span class="text-[11px] opacity-60">/ 14:00</span>
+          </div>
+          <button onclick="stopMock()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-2 text-[13px] font-bold">To'xtatish</button>
+          <button onclick="nextMockQuestion()" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-2 text-[13px] font-bold">Keyingi →</button>
+        </div>
+      </div>
+      <div class="p-4 sm:p-6 grid lg:grid-cols-[1.1fr_.9fr] gap-6">
+        <div>
+          <div class="inline-flex items-center gap-2 text-[11px] font-extrabold tracking-wide bg-amber-400 text-slate-900 px-2.5 py-1 rounded-full" id="mockQBadge">PART 1 • Q1</div>
+          <h3 id="mockQuestion" class="mt-3 font-serif text-[22px] leading-tight">Where is your hometown?</h3>
+          <p id="mockQHint" class="mt-2 text-[13px] text-slate-500">Tip: Use present simple + one complex sentence. Mention location and feeling.</p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button id="mockPlayBtn" onclick="playMockQuestion()" class="bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 rounded-full px-5 py-2.5 text-[13px] font-bold inline-flex items-center gap-2"><i data-lucide="volume-2" class="w-4 h-4"></i> Savolni eshitish</button>
+            <button id="mockRepeatBtn" onclick="playMockQuestion(true)" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-2.5 text-[13px] font-bold">🔁 Qayta</button>
+            <span id="mockVoiceLabel" class="inline-flex items-center gap-2 bg-slate-100 dark:bg-white/10 rounded-full px-3 py-2 text-[12px] font-semibold">Dilnoza • Qiz bola</span>
+          </div>
+          <div class="mt-5">
+            <div class="text-[11px] font-extrabold tracking-widest text-slate-500">BEST ANSWER (namuna)</div>
+            <div id="mockBestAnswer" class="mt-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-[13px] leading-6"></div>
+          </div>
+        </div>
+        <div class="bg-slate-50 dark:bg-white/[0.03] rounded-[20px] border border-slate-200 dark:border-white/10 p-4 sm:p-5">
+          <div class="flex items-center justify-between">
+            <div class="text-[11px] font-extrabold tracking-widest text-slate-500">SIZNING JAVOBINGIZ</div>
+            <span id="recStatus" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900">Tayyor</span>
+          </div>
+          <div class="mt-4 flex justify-center">
+            <button id="recBtn" onclick="toggleRecording()" class="w-[112px] h-[112px] rounded-full bg-red-500 text-white grid place-items-center shadow-lg hover:scale-[1.02] transition relative">
+              <i data-lucide="mic" class="w-8 h-8"></i>
+              <span class="absolute -bottom-1 bg-white text-slate-900 text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow">REC</span>
+            </button>
+          </div>
+          <div class="mt-4 flex items-center gap-2">
+            <div class="flex-1 h-2 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden"><div id="recBar" class="h-full w-0 bg-red-500 transition-all"></div></div>
+            <span id="recTime" class="font-mono text-[12px] font-bold">00:00</span>
+          </div>
+          <div class="mt-3 flex gap-2">
+            <button onclick="playLastRecording()" class="flex-1 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full py-2.5 text-[13px] font-bold inline-flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i> Tinglash</button>
+            <button onclick="saveMockAnswer()" class="flex-1 bg-emerald-500 text-white rounded-full py-2.5 text-[13px] font-bold">Saqlash ✓</button>
+          </div>
+          <audio id="playback" controls class="w-full mt-3 hidden"></audio>
+          <div id="mockSavedList" class="mt-4 space-y-2 max-h-[160px] overflow-auto"></div>
+          <p class="mt-3 text-[11px] leading-4 text-slate-500">Yozuvlar brauzeringizda saqlanadi (localStorage). Istasangiz yuklab olishingiz mumkin.</p>
+        </div>
+      </div>
+      <div class="px-4 sm:px-6 pb-6">
+        <div class="h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden"><div id="mockOverallBar" class="h-full bg-[#0F172A] dark:bg-white transition-all" style="width:9%"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DAILY -->
+<section id="view-daily" class="view hidden">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="grid lg:grid-cols-[1.15fr_.85fr] gap-6">
+      <div class="bg-white dark:bg-[#111A33] rounded-[24px] border border-slate-200 dark:border-white/10 shadow-soft overflow-hidden">
+        <div class="p-6 sm:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="inline-flex items-center gap-2 bg-amber-400 text-slate-900 rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide"><i data-lucide="flame" class="w-3.5 h-3.5"></i> 20' DAILY LESSON • STREAK <span id="streakVal" class="bg-slate-900 text-white px-1.5 py-0.5 rounded-full">1 kun</span></div>
+              <h1 class="mt-3 font-extrabold text-[28px] leading-none">Bugungi dars <span class="font-serif font-normal italic text-slate-500">#<span id="dailyNum">01</span></span></h1>
+              <p class="text-[13px] text-slate-500 mt-1">Bitta darsda Part 1 + Part 2 + Part 3 jamlanma — 20 daqiqa. Vaqt tugashi bilan keyingi mavzuga avtomatik o'tadi.</p>
+            </div>
+            <div class="text-right">
+              <div class="w-20 h-20 rounded-[20px] bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center">
+                <div class="text-[11px] font-extrabold tracking-widest opacity-70">TIMER</div>
+                <div id="dailyTimer" class="font-mono text-[22px] font-extrabold leading-none">20:00</div>
+              </div>
+              <button id="dailyToggle" onclick="toggleDaily()" class="mt-2 w-20 bg-emerald-500 text-white rounded-full py-1.5 text-[12px] font-bold">Boshlash</button>
+            </div>
+          </div>
+
+          <div class="mt-6 h-2 bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden"><div id="dailyProgress" class="h-full bg-emerald-500 transition-all" style="width:0%"></div></div>
+
+          <!-- lesson content -->
+          <div id="dailyLesson" class="mt-6 space-y-4"></div>
+
+          <div class="mt-6 flex flex-wrap gap-3">
+            <button onclick="completeDaily()" class="bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 rounded-full px-6 py-2.5 text-[13px] font-bold">Darsni yakunlash ✓</button>
+            <button onclick="skipDaily()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-6 py-2.5 text-[13px] font-bold">Keyingi mavzu → (20' dan so'ng auto)</button>
+            <span class="ml-auto text-[12px] text-slate-500 self-center">Avtomatik o'tish: <b id="autoNextLabel">20:00 dan so'ng</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="bg-[#0F172A] dark:bg-white text-white dark:text-slate-900 rounded-[24px] p-6">
+          <div class="text-[11px] font-extrabold tracking-widest opacity-60">7 KUNLIK REJA</div>
+          <div id="weekPlan" class="mt-3 grid grid-cols-7 gap-2 text-center"></div>
+          <div class="mt-4 p-3 rounded-xl bg-white/10 dark:bg-slate-900/10 backdrop-blur">
+            <div class="text-[13px] font-bold">Bugun: <span id="todayTopicName">Hometown + Cue Card #01 + Education</span></div>
+            <div class="text-[12px] opacity-70 mt-1">Har kuni yangi kombinatsiya. O'tkazib yubormang — streak saqlanadi!</div>
+          </div>
+        </div>
+        <div class="bg-white dark:bg-[#111A33] rounded-[24px] border border-slate-200 dark:border-white/10 p-5">
+          <div class="text-[11px] font-extrabold tracking-widest text-slate-500">NATIJALAR</div>
+          <div class="mt-3 space-y-2" id="dailyHistory"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TOPIC MODAL -->
+<div id="topicModal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeTopic()"></div>
+  <div class="absolute inset-0 sm:inset-4 lg:inset-8 bg-[#F8FAFC] dark:bg-[#0B1020] rounded-t-[20px] sm:rounded-[24px] shadow-2xl overflow-hidden flex flex-col">
+    <div class="shrink-0 bg-white dark:bg-[#111A33] border-b border-slate-200 dark:border-white/10 px-4 sm:px-6 py-4 flex items-center gap-4">
+      <div id="modalIcon" class="w-11 h-11 rounded-xl bg-slate-900 text-white grid place-items-center text-xl">💬</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span id="modalPart" class="text-[11px] font-extrabold tracking-wide bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-2 py-1 rounded-full">PART 1</span>
+          <span id="modalCount" class="text-[11px] font-bold bg-amber-400 text-slate-900 px-2 py-1 rounded-full">4 savol</span>
+          <span id="modalLevel" class="hidden sm:inline text-[11px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">Band 7-9</span>
+        </div>
+        <h2 id="modalTitle" class="font-extrabold text-[18px] sm:text-[20px] leading-tight truncate">Hometown</h2>
+        <p id="modalUz" class="text-[12px] text-slate-500 truncate">Vatani — Part 1</p>
+      </div>
+      <div class="hidden sm:flex items-center gap-2">
+        <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-white/10 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Audio</span>
+        <select id="modalVoiceSwitch" onchange="switchModalVoice(this.value)" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[12px] font-bold">
+          <option value="female">Dilnoza • Qiz bola</option>
+          <option value="male">Jasur • O'g'il bola</option>
+        </select>
+      </div>
+      <button onclick="closeTopic()" class="w-9 h-9 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center shrink-0"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+    <div class="flex-1 overflow-auto">
+      <div class="max-w-[920px] mx-auto px-4 sm:px-6 py-6 space-y-4" id="modalBody"></div>
+    </div>
+    <div class="shrink-0 bg-white dark:bg-[#111A33] border-t border-slate-200 dark:border-white/10 px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div class="text-[12px] text-slate-500 hidden sm:block">Har bir savolni audio bilan eshitib, keyin o'zingiz yozib olishingiz mumkin.</div>
+      <div class="flex gap-2 ml-auto">
+        <button onclick="closeTopic()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-5 py-2 text-[13px] font-bold">Yopish</button>
+        <button onclick="addToDailyFromModal()" class="bg-amber-400 text-slate-900 rounded-full px-5 py-2 text-[13px] font-extrabold">Daily ga qo'shish</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settingsModal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeSettings()"></div>
+  <div class="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-white dark:bg-[#0B1020] shadow-2xl overflow-auto">
+    <div class="p-6">
+      <div class="flex items-center justify-between">
+        <h2 class="font-extrabold text-[20px]">Sozlamalar</h2>
+        <button onclick="closeSettings()" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 grid place-items-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="mt-6 space-y-6">
+        <div class="bg-slate-50 dark:bg-white/5 rounded-2xl p-4 border border-slate-200 dark:border-white/10">
+          <div class="text-[11px] font-extrabold tracking-widest text-slate-500">KO'RINISH</div>
+          <div class="mt-3 flex items-center justify-between">
+            <div>
+              <div class="text-[14px] font-bold">Light / Dark mode</div>
+              <div class="text-[12px] text-slate-500">Saytni kun/tun rejimiga o'tkazish</div>
+            </div>
+            <button onclick="toggleTheme()" class="w-14 h-8 rounded-full bg-slate-900 dark:bg-white relative transition">
+              <span class="absolute top-1 left-1 w-6 h-6 rounded-full bg-white dark:bg-slate-900 grid place-items-center text-[10px] transition-all dark:translate-x-6">🌙</span>
+            </button>
+          </div>
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <button onclick="setTheme('light')" class="rounded-xl border-2 border-slate-900 dark:border-white/20 p-3 text-left bg-white dark:bg-white/5">
+              <div class="w-8 h-8 rounded-lg bg-slate-100 grid place-items-center">☀️</div>
+              <div class="text-[13px] font-bold mt-2">Light</div>
+              <div class="text-[11px] text-slate-500">Yorug' fon</div>
+            </button>
+            <button onclick="setTheme('dark')" class="rounded-xl border border-slate-200 dark:border-white/10 p-3 text-left bg-slate-900 text-white">
+              <div class="w-8 h-8 rounded-lg bg-white/15 grid place-items-center">🌙</div>
+              <div class="text-[13px] font-bold mt-2">Dark</div>
+              <div class="text-[11px] opacity-70">Qorong'u fon</div>
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 dark:bg-white/5 rounded-2xl p-4 border border-slate-200 dark:border-white/10">
+          <div class="text-[11px] font-extrabold tracking-widest text-slate-500">AUDIO AI YORDAMCHILAR</div>
+          <p class="text-[12px] text-slate-500 mt-1">Savollarni o'qib beradigan 2 ta ovoz — istalgan vaqtda almashtiring</p>
+          <div class="mt-3 grid gap-3">
+            <label class="flex items-center gap-3 bg-white dark:bg-[#111A33] border-2 rounded-2xl p-3 cursor-pointer has-[:checked]:border-slate-900 dark:has-[:checked]:border-white">
+              <input type="radio" name="voice" value="female" checked onchange="setVoice('female')" class="accent-slate-900">
+              <img src="https://i.pravatar.cc/100?img=5" class="w-10 h-10 rounded-full">
+              <div class="flex-1">
+                <div class="text-[13px] font-extrabold">Dilnoza — Qiz bola</div>
+                <div class="text-[11px] text-slate-500">Yoqimli, ravon, British accent • Tezligi sozlanadi</div>
+              </div>
+              <button onclick="previewVoice('female')" class="w-8 h-8 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center"><i data-lucide="volume-2" class="w-4 h-4"></i></button>
+            </label>
+            <label class="flex items-center gap-3 bg-white dark:bg-[#111A33] border-2 rounded-2xl p-3 cursor-pointer has-[:checked]:border-slate-900 dark:has-[:checked]:border-white">
+              <input type="radio" name="voice" value="male" onchange="setVoice('male')" class="accent-slate-900">
+              <img src="https://i.pravatar.cc/100?img=12" class="w-10 h-10 rounded-full">
+              <div class="flex-1">
+                <div class="text-[13px] font-extrabold">Jasur — O'g'il bola</div>
+                <div class="text-[11px] text-slate-500">Ishonchli, tiniq, American accent</div>
+              </div>
+              <button onclick="previewVoice('male')" class="w-8 h-8 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center"><i data-lucide="volume-2" class="w-4 h-4"></i></button>
+            </label>
+          </div>
+          <div class="mt-4">
+            <div class="flex items-center justify-between">
+              <span class="text-[12px] font-bold">Ovoz tezligi</span>
+              <span id="rateVal" class="text-[12px] font-mono bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-2 py-0.5 rounded-full">1.0×</span>
+            </div>
+            <input id="voiceRate" type="range" min="0.7" max="1.3" step="0.1" value="1" oninput="setRate(this.value)" class="w-full mt-2 range">
+            <div class="flex justify-between text-[10px] text-slate-500"><span>Sekin</span><span>Normal</span><span>Tez</span></div>
+          </div>
+          <label class="mt-3 flex items-center gap-2 text-[13px] font-semibold">
+            <input id="autoPlay" type="checkbox" checked onchange="saveSettings()" class="accent-slate-900"> Savol ochilganda avtomatik o'qish
+          </label>
+        </div>
+
+        <div class="bg-amber-50 dark:bg-amber-500/10 rounded-2xl p-4 border border-amber-200 dark:border-amber-500/20">
+          <div class="text-[11px] font-extrabold tracking-widest text-amber-700 dark:text-amber-300">QIDIRISH</div>
+          <p class="text-[12px] leading-5 mt-1">Tepada va har bir Part bo'limida alohida qidirish bor. Mavzu nomi, savol matni yoki kalit so'z bo'yicha izlang — masalan: <b>pollution, hometown, describe a book</b>.</p>
+        </div>
+
+        <button onclick="closeSettings()" class="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full py-3 font-bold">Saqlash va yopish</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#0B1020] mt-10">
+  <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500">
+      <div>© 2026 IELTS Speaking Pro — Barcha mavzular IELTS 2026 formatiga mos. Made for Uzbekistan 🇺🇿</div>
+      <div class="flex gap-4"><a href="#" class="hover:underline">Maxfiylik</a><a href="#" class="hover:underline">Yordam</a><a href="#" class="hover:underline">Aloqa</a></div>
+    </div>
+  </div>
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
