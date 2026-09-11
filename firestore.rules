@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// ============================================================
+//  IELTS Speaking Pro — Firestore Security Rules
+//  Tamoyil: har bir foydalanuvchi FAQAT o'z ma'lumotlarini
+//  o'qiy/yozadi. Autentifikatsiyasiz — hech narsa yo'q.
+//  O'rnatish: Firebase Console → Firestore Database → Rules →
+//  shu fayl mazmunini joylashtiring → Publish.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- yordamchi funksiyalar ---
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Hujjat maydonlari sanitariyasi (hashAR qanday yozsa-yozsin, cheklov qo'yamiz)
+    function validUserDoc() {
+      return (!('displayName' in request.resource.data)
+               || (request.resource.data.displayName is string
+                   && request.resource.data.displayName.size() <= 40))
+          && (!('email' in request.resource.data)
+               || (request.resource.data.email is string
+                   && request.resource.data.email.size() <= 120))
+          && (!('data' in request.resource.data)
+               || (request.resource.data.data is map
+                   && request.resource.data.data.keys().size() <= 16));
+    }
+
+    // Foydalanuvchi profili + natijalar: users/{uid}
+    // data maydoni ichida: mockHistory, mockSavesMeta, mockDone,
+    // dailyHistory, dailyNum, streak, lastMockIds, recs, updatedAt
+    match /users/{uid} {
+      allow get:    if isOwner(uid);                      // faqat egasi o'qiydi
+      allow list:   if false;                             // ro'yxatlash umuman taqiqlangan
+      allow create: if isOwner(uid) && validUserDoc();
+      allow update: if isOwner(uid) && validUserDoc();
+      allow delete: if isOwner(uid);                      // o'z akkauntini o'chirishi mumkin
+
+      // kelajakda sub-kolleksiyalar bo'lsa ham — faqat egasi
+      match /{document=**} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // Boshqa HAMMA hujjatlar (collect /{document=**}) — taqiqlangan
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

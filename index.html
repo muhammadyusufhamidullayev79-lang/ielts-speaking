@@ -7,7 +7,7 @@
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta http-equiv="Permissions-Policy" content="microphone=(self), camera=(), geolocation=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; media-src 'self' blob: data: https:; connect-src 'self' https: data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://unpkg.com https://www.gstatic.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; media-src 'self' blob: data: https:; connect-src 'self' https: wss: data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
 <title>IELTS Speaking Pro — 9.0 sari professional tayyorgarlik</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
 <link rel="apple-touch-icon" href="assets/logo.png">
@@ -69,9 +69,8 @@ html.dark { color-scheme: dark; }
         <button onclick="openSettings()" class="w-9 h-9 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 grid place-items-center">
           <i data-lucide="settings-2" class="w-4 h-4"></i>
         </button>
-        <button class="hidden sm:inline-flex items-center gap-2 bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-2 text-[13px] font-bold">
-          <span class="w-6 h-6 rounded-full bg-amber-400 grid place-items-center text-[#0F172A] text-[11px] font-extrabold">Y</span> Yusuf
-        </button>
+        <!-- AUTH HUDUDI: renderAuthUI() to'ldiradi (mehmon: Kirish/Ro'yxatdan o'tish; a'zo: ism + Chiqish) -->
+        <div id="authArea" class="flex items-center gap-2"></div>
         <button class="lg:hidden p-2" onclick="toggleMobileMenu()"><i data-lucide="menu" class="w-5 h-5"></i></button>
       </div>
     </div>
@@ -88,6 +87,8 @@ html.dark { color-scheme: dark; }
         <input id="globalSearchM" placeholder="Mavzu qidirish..." maxlength="80" autocomplete="off" spellcheck="false" inputmode="search" class="bg-transparent outline-none text-sm flex-1">
         <button onclick="document.getElementById('globalSearch').value=document.getElementById('globalSearchM').value;doGlobalSearch()" class="bg-slate-900 text-white rounded-full px-3 py-1 text-sm">Qidirish</button>
       </div>
+      <!-- AUTH (mobil): renderAuthUI() to'ldiradi -->
+      <div id="authAreaM" class="flex flex-col gap-2 pt-1"></div>
     </div>
   </div>
 </header>
@@ -349,6 +350,10 @@ html.dark { color-scheme: dark; }
             <div><div class="font-mono text-[20px] font-bold" id="mockStatsDone">0</div><div class="opacity-70">siz bajardingiz</div></div>
             <div><div class="font-mono text-[20px] font-bold">11-14 min</div><div class="opacity-70">davomiylik</div></div>
           </div>
+          <div id="mockLoginNote" class="mt-5 inline-flex flex-wrap items-center gap-2 bg-amber-400/95 text-slate-900 rounded-full px-4 py-2 text-[12px] font-extrabold shadow-soft">
+            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Natijalar akkauntingizga saqlanadi —
+            <button onclick="openAuthModal('login','Mock topshirish uchun tizimga kiring.')" class="underline decoration-2 underline-offset-2">Kirish / Ro'yxatdan o'tish</button>
+          </div>
         </div>
         <div class="bg-white text-slate-900 dark:bg-[#1B2540] dark:text-white rounded-[20px] p-5 shadow-soft">
           <div class="flex items-center justify-between">
@@ -563,6 +568,10 @@ html.dark { color-scheme: dark; }
             <button onclick="skipDaily()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-6 py-2.5 text-[13px] font-bold">Keyingi mavzu → (20' dan so'ng auto)</button>
             <span class="ml-auto text-[12px] text-slate-500 self-center">Avtomatik o'tish: <b id="autoNextLabel">20:00 dan so'ng</b></span>
           </div>
+          <div id="dailyLoginNote" class="mt-3 inline-flex flex-wrap items-center gap-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-full px-4 py-2 text-[12px] font-extrabold">
+            <i data-lucide="lock" class="w-3.5 h-3.5"></i> Streak va dars natijalari akkauntda saqlanadi —
+            <button onclick="openAuthModal('login','Daily natijalarni saqlash uchun tizimga kiring.')" class="underline decoration-2 underline-offset-2">Kirish / Ro'yxatdan o'tish</button>
+          </div>
         </div>
       </div>
 
@@ -616,6 +625,88 @@ html.dark { color-scheme: dark; }
       <div class="flex gap-2 ml-auto">
         <button onclick="closeTopic()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-5 py-2 text-[13px] font-bold">Yopish</button>
         <button onclick="addToDailyFromModal()" class="bg-amber-400 text-slate-900 rounded-full px-5 py-2 text-[13px] font-extrabold">Daily ga qo'shish</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL (Kirish / Ro'yxatdan o'tish / Parolni tiklash) -->
+<div id="authModal" class="fixed inset-0 z-[60] hidden">
+  <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeAuthModal()"></div>
+  <div class="absolute inset-0 overflow-auto py-6 px-4 pointer-events-none">
+    <div id="authPanel" class="relative pointer-events-auto max-w-[430px] mx-auto bg-white dark:bg-[#0B1020] rounded-[24px] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
+      <!-- sarlavha -->
+      <div class="bg-gradient-to-br from-[#0F172A] to-[#1E293B] dark:from-[#111A33] dark:to-[#0B1020] text-white px-6 pt-6 pb-5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-[11px] font-extrabold tracking-wide bg-white/10 rounded-full px-3 py-1"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> XAVFSIZ AKKAUNT</div>
+          <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-white/10 grid place-items-center hover:bg-white/20 transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+        <h2 class="mt-3 font-serif text-[26px] leading-tight">Xush kelibsiz <span class="italic">Eagle 9</span> ga</h2>
+        <p class="text-[12px] text-white/70 mt-1">Natijalar, streak va audio tarix — barcha qurilmalarda sinxron bo'ladi.</p>
+      </div>
+      <div class="px-6 py-5">
+        <!-- sabab (gating) xabari -->
+        <div id="authReason" class="hidden mb-4 text-[12px] font-bold bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl px-3 py-2"></div>
+        <!-- tab tugmalari -->
+        <div class="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-white/5 rounded-full p-1">
+          <button id="authTabLogin" onclick="setAuthMode('login')" class="auth-tab rounded-full py-2 text-[13px] font-extrabold transition">Kirish</button>
+          <button id="authTabSignup" onclick="setAuthMode('signup')" class="auth-tab rounded-full py-2 text-[13px] font-extrabold transition">Ro'yxatdan o'tish</button>
+        </div>
+        <!-- xato / muvaffaqiyat xabarlari -->
+        <div id="authError" class="hidden mt-3 text-[12px] font-bold bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-300 rounded-xl px-3 py-2"></div>
+        <div id="authInfo" class="hidden mt-3 text-[12px] font-bold bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-300 rounded-xl px-3 py-2"></div>
+        <!-- KIRISH -->
+        <form id="authLoginForm" class="mt-4 space-y-3" onsubmit="doLogin(event)" novalidate>
+          <div>
+            <label for="loginEmail" class="text-[12px] font-extrabold tracking-wide text-slate-500 dark:text-slate-400">EMAIL</label>
+            <input id="loginEmail" type="email" required autocomplete="email" placeholder="siz@example.com" class="auth-input mt-1">
+          </div>
+          <div>
+            <label for="loginPass" class="text-[12px] font-extrabold tracking-wide text-slate-500 dark:text-slate-400">PAROL</label>
+            <input id="loginPass" type="password" required autocomplete="current-password" placeholder="••••••••" class="auth-input mt-1">
+          </div>
+          <div class="flex justify-end">
+            <button type="button" onclick="setAuthMode('reset')" class="text-[12px] font-bold text-sky-600 dark:text-sky-300 hover:underline">Parolni unutdingizmi?</button>
+          </div>
+          <button type="submit" id="loginSubmitBtn" class="auth-btn-primary">Kirish</button>
+        </form>
+        <!-- RO'YXATDAN O'TISH -->
+        <form id="authSignupForm" class="mt-4 space-y-3 hidden" onsubmit="doSignup(event)" novalidate>
+          <div>
+            <label for="signupName" class="text-[12px] font-extrabold tracking-wide text-slate-500 dark:text-slate-400">ISMINGIZ</label>
+            <input id="signupName" type="text" required maxlength="40" autocomplete="name" placeholder="Masalan: Yusuf" class="auth-input mt-1">
+          </div>
+          <div>
+            <label for="signupEmail" class="text-[12px] font-extrabold tracking-wide text-slate-500 dark:text-slate-400">EMAIL</label>
+            <input id="signupEmail" type="email" required autocomplete="email" placeholder="siz@example.com" class="auth-input mt-1">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label for="signupPass" class="text-[12px] font-extrabold tracking-wide text-slate-500 dark:text-slate-400">PAROL</label>
+              <input id="signupPass" type="password" required minlength="6" autocomplete="new-password" placeholder="min. 6 belgi" class="auth-input mt-1">
+            </div>
+            <div>
+              <label for="signupPass2" class="text-[12px] font-extrabold tracking-wide text-slate-500 dark:text-slate-400">PAROL (TAKROR)</label>
+              <input id="signupPass2" type="password" required minlength="6" autocomplete="new-password" placeholder="qayta yozing" class="auth-input mt-1">
+            </div>
+          </div>
+          <button type="submit" id="signupSubmitBtn" class="auth-btn-primary">Akkaunt yaratish</button>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 text-center leading-4">Mavzular login siz ham ochiq — akkaunt faqat natijalarni saqlash uchun.</p>
+        </form>
+        <!-- PAROLNI TIKLASH -->
+        <form id="authResetForm" class="mt-4 space-y-3 hidden" onsubmit="doResetPassword(event)" novalidate>
+          <p class="text-[12px] text-slate-500 dark:text-slate-400 leading-5">Emailingizni kiriting — parolni tiklash havolasini yuboramiz. Havola bilan yangi parol o'rnatasiz.</p>
+          <div>
+            <label for="resetEmail" class="text-[12px] font-extrabold tracking-wide text-slate-500 dark:text-slate-400">EMAIL</label>
+            <input id="resetEmail" type="email" required autocomplete="email" placeholder="siz@example.com" class="auth-input mt-1">
+          </div>
+          <button type="submit" id="resetSubmitBtn" class="auth-btn-primary">Tiklash havolasini yuborish</button>
+          <button type="button" onclick="setAuthMode('login')" class="w-full text-[12px] font-bold text-slate-500 hover:underline">← Kirishga qaytish</button>
+        </form>
+        <div class="mt-4 pt-4 border-t border-slate-100 dark:border-white/10 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-2">
+          <i data-lucide="lock" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
+          <span>Har bir foydalanuvchi faqat o'z natijalarini ko'radi — ma'lumotlar Firebase Authentication + Firestore bilan himoyalanadi.</span>
+        </div>
       </div>
     </div>
   </div>
@@ -717,6 +808,10 @@ html.dark { color-scheme: dark; }
 </footer>
 
 <script src="js/data.js" defer></script>
+<!-- Firebase (compat SDK — oddiy <script> bilan ishlaydi, modul talab qilmaydi) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" defer crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="js/app.js" defer></script>
 <noscript><div style="max-width:640px;margin:40px auto;padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;text-align:center;font-family:system-ui">JavaScript yoqilgan bo'lishi kerak. Iltimos, brauzer sozlamalarida JavaScript-ni yoqing.</div></noscript>
 </body>

@@ -23,9 +23,21 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
-// safe storage with quota guard
+// safe storage with quota guard — sync kalitlari yozilsa, bulutga push rejalashtiriladi
 function safeGet(k, d=null){ try{ const v = localStorage.getItem(k); return v===null ? d : v; }catch(e){ return d; } }
-function safeSet(k, v){ try{ localStorage.setItem(k, v); return true; }catch(e){ if(e && e.name==='QuotaExceededError'){ try{ localStorage.removeItem('mockSavesMeta'); localStorage.removeItem('dailyHistory'); }catch(_){} try{ localStorage.setItem(k, v); return true; }catch(_){} } return false; } }
+function safeSet(k, v){
+  let ok=true;
+  try{ localStorage.setItem(k, v); }
+  catch(e){
+    ok=false;
+    if(e && e.name==='QuotaExceededError'){
+      try{ localStorage.removeItem('mockSavesMeta'); localStorage.removeItem('dailyHistory'); }catch(_){}
+      try{ localStorage.setItem(k, v); ok=true; }catch(_){ }
+    }
+  }
+  if(ok && isSyncedKey(k)) queueCloudSave();
+  return ok;
+}
 function safeJSON(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
 
 // === custom data override (admin panel) ===
@@ -51,6 +63,39 @@ function loadCustomData(){
 }
 const _customData = loadCustomData();
 const DATA = _customData || _DATA_SRC;
+
+// ============================================================
+// FIREBASE CONFIG — BU YERGA O'Z LOYIHANGIZ KALITLARINI QO'YING
+//   1) https://console.firebase.google.com → "Add project"
+//   2) Project settings → Your apps → "</>" (Web) → config nusxalang
+//   3) Quyidagi PASTE_... qiymatlarni almashtiring
+//   Qadam-baqadam yo'riqnoma: FIREBASE_SETUP.md
+//   Firebase sozlanmasa — sayt oddiy (login siz) rejimda ishlayveradi.
+// ============================================================
+const FIREBASE_CONFIG = {
+  apiKey:            "PASTE_API_KEY",
+  authDomain:        "PASTE_AUTH_DOMAIN",
+  projectId:         "PASTE_PROJECT_ID",
+  storageBucket:     "PASTE_STORAGE_BUCKET",
+  messagingSenderId: "PASTE_MESSAGING_SENDER_ID",
+  appId:             "PASTE_APP_ID"
+};
+function isFirebaseConfigured(){
+  try{ return typeof firebase!=='undefined' && !!FIREBASE_CONFIG.apiKey && !/^PASTE_/.test(FIREBASE_CONFIG.apiKey) && !!FIREBASE_CONFIG.projectId && !/^PASTE_/.test(FIREBASE_CONFIG.projectId); }
+  catch(e){ return false; }
+}
+
+// === AUTH & CLOUD holati ===
+let fbAuth=null, fbDb=null;
+let authUser=null;                 // hozir login qilgan foydalanuvchi (firebase.User | null)
+let authReady=false;               // onAuthStateChanged birinchi marta ishlaganmi
+let cloudUnsub=null;               // Firestore real-time listener
+let cloudPushTimer=null;           // debounce taymeri
+// localStorage -> Firestore sinxronlanadigan kalitlar
+// (Mock natijalari, Daily streak/darslar, oxirgi mock savollari, audio yozuvlar tarixi)
+const SYNC_KEYS=['mockHistory','mockSavesMeta','mockDone','dailyHistory','dailyNum','streak','lastMockIds'];
+function isSyncedKey(k){ return SYNC_KEYS.indexOf(k)!==-1 || (typeof k==='string' && k.indexOf('recs_')===0); }
+
 
 let currentPreviewTab = 'part1';
 let previewLimit = 8;
@@ -88,6 +133,8 @@ let streak = parseInt(safeGet('streak','1'));
 document.addEventListener('DOMContentLoaded', ()=>{
   initTheme();
   initVoiceUI();
+  initFirebase();      // Firebase Auth + Firestore (sozlanmagan bo'lsa — mehmon rejimi)
+  renderAuthUI();
   refreshIcons();
   bindSearches();
   renderPreview();
@@ -590,6 +637,8 @@ function buildMockQueue(){
   return queue;
 }
 function startMock(){
+  // HIMOYA: mock natijalari faqat login qilgan foydalanuvchilar uchun saqlanadi
+  if(!requireAuth("Mock topshirish uchun tizimga kiring — natijalar va audio yozuvlar akkauntingizga saqlanadi.")) return;
   mockQueue=buildMockQueue();
   mockIndex=0;
   mockElapsed=0;
@@ -866,6 +915,7 @@ function clearMockHistory(){
   if(!confirm('Barcha mock tarixini o‘chirishni istaysizmi?')) return;
   try{ localStorage.removeItem('mockHistory'); localStorage.removeItem('mockSavesMeta'); localStorage.removeItem('mockDone'); }catch(e){}
   mockSessionSaves=[]; mockAnsweredMap={}; mockAnswersMeta=[]; mockSessionAnswered=0;
+  if(authUser) queueCloudSave();   // login qilgan bo'lsa — bulutdan ham tozalanadi
   renderMockHistory(); updateMockStats();
 }
 function updateMockStats(){
@@ -1087,6 +1137,8 @@ function restartDaily(){
 }
 // === TO'LIQ RESET: dars raqami 01 dan, streak qaytadan ===
 function resetDailyProgress(){
+  // HIMOYA: progress (streak/tarix) o'chirish ham akkaunt ma'lumotiga tegishli — login kerak
+  if(!requireAuth("Progressni noldan boshlash uchun tizimga kiring.")) return;
   if(!confirm('Daily progress noldan boshlansinmi? (dars #01, timer 20:00, 7 kunlik reja yangilanadi)')) return;
   clearInterval(dailyInterval); dailyInterval=null;
   dailyRunning=false;
@@ -1110,6 +1162,8 @@ function renderDailyTopicsInfo(){
   el.textContent = `${p1.title} + ${p2.title.slice(0,32)}... + ${p3.title}`;
 }
 function completeDaily(auto){
+  // HIMOYA: daily natija/streak faqat login qilgan foydalanuvchilar uchun saqlanadi
+  if(!requireAuth("Daily dars natijasi va streak saqlanishi uchun tizimga kiring.")){ pauseDaily(); return; }
   clearInterval(dailyInterval); dailyInterval=null;
   dailyRunning=false;
   const p1 = DATA.part1[(dailyNum*7) % DATA.part1.length];
@@ -1133,6 +1187,7 @@ function completeDaily(auto){
   }
 }
 function skipDaily(){
+  if(!requireAuth("Daily dars natijasi va streak saqlanishi uchun tizimga kiring.")) return;
   if(!confirm('Keyingi mavzuga o‘tishni istaysizmi? Joriy dars yakunlangan deb hisoblanadi.')) return;
   completeDaily(false);
 }
@@ -1141,6 +1196,428 @@ function resetDailyLesson(){ restartDaily(); }
 // SETTINGS modal
 function openSettings(){ document.getElementById('settingsModal').classList.remove('hidden'); document.body.style.overflow='hidden'; refreshIcons(); }
 function closeSettings(){ document.getElementById('settingsModal').classList.add('hidden'); document.body.style.overflow=''; saveSettings(); }
+
+// ============================================================
+// ============  AUTH (Firebase Authentication)  ===============
+// ============================================================
+
+// Firebase'ni ishga tushirish (DOMContentLoaded da chaqiriladi)
+function initFirebase(){
+  if(!isFirebaseConfigured()){
+    console.warn("[Firebase] sozlanmagan — Kirish/Ro'yxatdan o'tish o'chiriladi. js/app.js dagi FIREBASE_CONFIG ni to'ldiring (FIREBASE_SETUP.md).");
+    return;
+  }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth=firebase.auth();
+    fbDb=firebase.firestore();
+    // offline'da yozuvlar navbatda turadi, internet kelganda yuboriladi
+    try{ fbDb.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
+    fbAuth.useDeviceLanguage();
+    fbAuth.onAuthStateChanged(u=>{
+      authReady=true;
+      const wasUser=!!authUser;
+      authUser=u||null;
+      renderAuthUI();
+      if(u) syncOnLogin(u);
+      else if(wasUser && cloudUnsub){ try{cloudUnsub();}catch(e){} cloudUnsub=null; }
+    });
+  }catch(e){
+    console.error('[Firebase] ishga tushmadi:', e);
+    fbAuth=null; fbDb=null;
+    renderAuthUI();
+  }
+}
+
+// --- modal boshqaruvi ---
+let authMode='login';   // 'login' | 'signup' | 'reset'
+function openAuthModal(mode, reason){
+  authMode = (mode==='signup'||mode==='reset') ? mode : 'login';
+  hideAuthMsg();
+  const r=document.getElementById('authReason');
+  if(r){ if(reason){ r.textContent=reason; r.classList.remove('hidden'); } else r.classList.add('hidden'); }
+  document.getElementById('authModal').classList.remove('hidden');
+  document.body.style.overflow='hidden';
+  applyAuthMode();
+  refreshIcons();
+}
+function closeAuthModal(){
+  document.getElementById('authModal').classList.add('hidden');
+  document.body.style.overflow='';
+  // parol maydonlarini tozalash
+  ['loginPass','signupPass','signupPass2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+}
+function setAuthMode(mode){ authMode=mode; hideAuthMsg(); applyAuthMode(); }
+function applyAuthMode(){
+  const showLogin=authMode==='login', showSignup=authMode==='signup', showReset=authMode==='reset';
+  document.getElementById('authLoginForm').classList.toggle('hidden', !showLogin);
+  document.getElementById('authSignupForm').classList.toggle('hidden', !showSignup);
+  document.getElementById('authResetForm').classList.toggle('hidden', !showReset);
+  document.getElementById('authTabLogin').classList.toggle('auth-tab-active', showLogin);
+  document.getElementById('authTabSignup').classList.toggle('auth-tab-active', showSignup);
+  const f = showLogin ? 'loginEmail' : showSignup ? 'signupName' : 'resetEmail';
+  setTimeout(()=>{ const el=document.getElementById(f); if(el) try{el.focus();}catch(e){} }, 60);
+}
+function hideAuthMsg(){
+  const e=document.getElementById('authError'), i=document.getElementById('authInfo');
+  if(e) e.classList.add('hidden');
+  if(i) i.classList.add('hidden');
+}
+function showAuthError(msg){
+  hideAuthMsg();
+  const e=document.getElementById('authError');
+  if(e){ e.textContent=msg; e.classList.remove('hidden'); }
+}
+function showAuthInfo(msg){
+  hideAuthMsg();
+  const i=document.getElementById('authInfo');
+  if(i){ i.textContent=msg; i.classList.remove('hidden'); }
+}
+function setAuthBusy(kind, busy){
+  const map={login:'loginSubmitBtn', signup:'signupSubmitBtn', reset:'resetSubmitBtn'};
+  const btn=document.getElementById(map[kind]);
+  if(!btn) return;
+  btn.disabled=busy;
+  if(busy){ btn.dataset.label=btn.textContent; btn.textContent="Bir daqiqa..."; }
+  else if(btn.dataset.label){ btn.textContent=btn.dataset.label; }
+}
+// Firebase xatolarini o'zbekchaga o'girish
+function uzAuthError(err){
+  const code=(err && err.code) || '';
+  const M={
+    'auth/invalid-email':"Email formati noto'g'ri — tekshirib qayta urinib ko'ring.",
+    'auth/user-disabled':"Bu akkaunt bloklangan. Support bilan bog'laning.",
+    'auth/user-not-found':"Bunday email topilmadi — avval ro'yxatdan o'ting.",
+    'auth/wrong-password':"Parol xato — qayta urinib ko'ring.",
+    'auth/invalid-credential':"Email yoki parol xato — tekshirib qayta urinib ko'ring.",
+    'auth/email-already-in-use':"Bu email allaqachon band — 'Kirish' bo'limidan kiring.",
+    'auth/weak-password':"Parol juda oddiy — kamida 6 belgi (harf+raqam) kiriting.",
+    'auth/too-many-requests':"Juda ko'p urinish — 1-2 daqiqadan so'ng qayta urinib ko'ring.",
+    'auth/network-request-failed':"Internet aloqasi yo'q — tarmoqni tekshiring.",
+    'auth/operation-not-allowed':"Firebase'da Email/Parol usuli yoqilmagan (FIREBASE_SETUP.md 2-qadam)."
+  };
+  return M[code] || ("Xatolik: "+((err && err.message) || 'nomalum')).replace('Firebase: ','');
+}
+
+// --- Kirish / Ro'yxatdan o'tish / Parolni tiklash / Chiqish ---
+async function doLogin(e){
+  if(e) e.preventDefault();
+  if(!requireFirebase()) return;
+  const email=(document.getElementById('loginEmail').value||'').trim();
+  const pass=document.getElementById('loginPass').value||'';
+  if(!email || !pass) return showAuthError("Email va parolni kiriting.");
+  setAuthBusy('login', true); hideAuthMsg();
+  try{
+    await fbAuth.signInWithEmailAndPassword(email, pass);
+    closeAuthModal();
+  }catch(err){ showAuthError(uzAuthError(err)); }
+  finally{ setAuthBusy('login', false); }
+}
+async function doSignup(e){
+  if(e) e.preventDefault();
+  if(!requireFirebase()) return;
+  const name=sanitizeInput(document.getElementById('signupName').value, 40);
+  const email=(document.getElementById('signupEmail').value||'').trim();
+  const p1=document.getElementById('signupPass').value||'';
+  const p2=document.getElementById('signupPass2').value||'';
+  if(name.length<2) return showAuthError("Ismingizni kiriting (kamida 2 harf).");
+  if(!email) return showAuthError("Email kiriting.");
+  if(p1.length<6) return showAuthError("Parol kamida 6 belgidan iborat bo'lsin.");
+  if(p1!==p2) return showAuthError("Parollar mos kelmadi — qayta tekshiring.");
+  setAuthBusy('signup', true); hideAuthMsg();
+  try{
+    const cred=await fbAuth.createUserWithEmailAndPassword(email, p1);
+    await cred.user.updateProfile({displayName:name});
+    authUser=cred.user;
+    await writeProfileNow(cred.user);     // ism/emailni hujjatga yozamiz
+    closeAuthModal();
+  }catch(err){ showAuthError(uzAuthError(err)); }
+  finally{ setAuthBusy('signup', false); }
+}
+async function doResetPassword(e){
+  if(e) e.preventDefault();
+  if(!requireFirebase()) return;
+  const email=(document.getElementById('resetEmail').value||'').trim();
+  if(!email) return showAuthError("Email kiriting.");
+  setAuthBusy('reset', true); hideAuthMsg();
+  try{
+    await fbAuth.sendPasswordResetEmail(email);
+    showAuthInfo("Tiklash havolasi "+email+" manziliga yuborildi. Spam papkani ham tekshiring.");
+  }catch(err){ showAuthError(uzAuthError(err)); }
+  finally{ setAuthBusy('reset', false); }
+}
+async function doLogout(){
+  if(!fbAuth){ return; }
+  try{
+    if(cloudPushTimer){ clearTimeout(cloudPushTimer); cloudPushTimer=null; }
+    if(authUser) await pushCloudNow(authUser).catch(()=>{});   // chiqishdan oldin oxirgi holatni saqlaymiz
+    if(cloudUnsub){ try{cloudUnsub();}catch(e){} cloudUnsub=null; }
+    await fbAuth.signOut();
+    authUser=null;
+    try{ localStorage.removeItem('syncUid'); }catch(e){}
+    renderAuthUI();
+  }catch(e){ alert("Chiqishda xatolik: "+(e.message||e)); }
+}
+function requireFirebase(){
+  if(fbAuth) return true;
+  showAuthError("Firebase hali sozlanmagan. js/app.js ichidagi FIREBASE_CONFIG ni to'ldiring — yo'riqnoma: FIREBASE_SETUP.md");
+  return false;
+}
+// HIMOYA: saqlash amallari uchun login tekshiruvi
+function requireAuth(reason){
+  if(authUser) return true;
+  openAuthModal('login', reason || "Bu amal uchun akkaunt kerak.");
+  return false;
+}
+
+// --- header'dagi auth UI (desktop + mobil) ---
+function userDisplayName(u){
+  if(u && u.displayName && String(u.displayName).trim()) return String(u.displayName).trim();
+  if(u && u.email) return String(u.email).split('@')[0];
+  return 'Foydalanuvchi';
+}
+function userInitial(u){ const n=userDisplayName(u); return (n[0]||'U').toUpperCase(); }
+function renderAuthUI(){
+  const area=document.getElementById('authArea');
+  const areaM=document.getElementById('authAreaM');
+  if(authUser){
+    const name=userDisplayName(authUser);
+    const email=authUser.email||'';
+    const init=escapeHTML(userInitial(authUser));
+    if(area) area.innerHTML = `
+      <span id="cloudDot" class="hidden sm:grid w-2 h-2 rounded-full bg-slate-300" title="Sinxronizatsiya holati"></span>
+      <div class="hidden sm:flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full pl-1.5 pr-1.5 py-1">
+        <span class="w-8 h-8 rounded-full bg-amber-400 text-slate-900 grid place-items-center text-[12px] font-extrabold">${init}</span>
+        <span class="max-w-[120px] leading-none text-left">
+          <span class="block text-[12px] font-extrabold truncate">${escapeHTML(name)}</span>
+          <span class="block text-[10px] text-slate-500 dark:text-slate-400 truncate">${escapeHTML(email)}</span>
+        </span>
+        <button onclick="doLogout()" title="Chiqish" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 grid place-items-center hover:bg-red-500 hover:text-white transition"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+      </div>
+      <span class="sm:hidden w-9 h-9 rounded-full bg-amber-400 text-slate-900 grid place-items-center text-[13px] font-extrabold">${init}</span>`;
+    if(areaM) areaM.innerHTML = `
+      <div class="flex items-center gap-3 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-2xl px-3 py-2.5">
+        <span class="w-9 h-9 rounded-full bg-amber-400 text-slate-900 grid place-items-center text-[13px] font-extrabold">${init}</span>
+        <span class="flex-1 min-w-0 leading-tight">
+          <span class="block text-[13px] font-extrabold truncate">${escapeHTML(name)}</span>
+          <span class="block text-[11px] text-slate-500 dark:text-slate-400 truncate">${escapeHTML(email)}</span>
+        </span>
+        <button onclick="doLogout()" class="bg-slate-100 dark:bg-white/10 rounded-full px-3.5 py-2 text-[12px] font-extrabold inline-flex items-center gap-1.5 hover:bg-red-500 hover:text-white transition"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> Chiqish</button>
+      </div>`;
+    setCloudDot('ok');
+  } else {
+    if(area) area.innerHTML = `
+      <button onclick="openAuthModal('login')" class="px-4 py-2 rounded-full text-[13px] font-bold bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/20 transition">Kirish</button>
+      <button onclick="openAuthModal('signup')" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-2.5 text-[13px] font-extrabold hover:opacity-90 transition">Ro'yxatdan o'tish</button>`;
+    if(areaM) areaM.innerHTML = `
+      <div class="flex gap-2">
+        <button onclick="openAuthModal('login')" class="flex-1 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-2.5 text-[13px] font-extrabold">Kirish</button>
+        <button onclick="openAuthModal('signup')" class="flex-1 bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-2.5 text-[13px] font-extrabold">Ro'yxatdan o'tish</button>
+      </div>`;
+  }
+  updateLoginNotes();
+  refreshIcons();
+}
+// Mock/Daily'dagi "login kerak" eslatmalarini yangilash
+function updateLoginNotes(){
+  ['mockLoginNote','dailyLoginNote'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.toggle('hidden', !!authUser);
+  });
+}
+function setCloudDot(state){
+  const dot=document.getElementById('cloudDot');
+  if(!dot) return;
+  dot.classList.remove('hidden','bg-emerald-500','bg-amber-400','bg-red-500','bg-slate-300','animate-pulse');
+  if(state==='ok'){ dot.classList.add('bg-emerald-500'); dot.title="Bulut bilan sinxron ✓"; }
+  else if(state==='busy'){ dot.classList.add('bg-amber-400','animate-pulse'); dot.title="Sinxronlanmoqda..."; }
+  else if(state==='error'){ dot.classList.add('bg-red-500'); dot.title="Sinxronizatsiya xatosi — internetni tekshiring"; }
+  else { dot.classList.add('bg-slate-300'); dot.title=""; }
+}
+
+// ============================================================
+// ======  CLOUD SYNC (localStorage <-> Firestore)  ============
+//  Ma'lumot modeli: users/{uid} = { displayName, email, createdAt,
+//  lastLoginAt, data: { mockHistory, mockSavesMeta, mockDone,
+//  dailyHistory, dailyNum, streak, lastMockIds, recs, updatedAt } }
+//  Har bir foydalanuvchi faqat o'z hujjatini o'qiy/yozadi (firestore.rules)
+// ============================================================
+function collectRecs(){
+  const out={};
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k && k.indexOf('recs_')===0){
+        const items=safeJSON(k,[]);
+        if(Array.isArray(items) && items.length) out[k.slice(5)]=items.slice(-12);
+      }
+    }
+  }catch(e){}
+  return out;
+}
+function applyRecs(recs){
+  if(!recs || typeof recs!=='object' || Array.isArray(recs)) return;
+  try{
+    const kill=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k && k.indexOf('recs_')===0 && !recs[k.slice(5)]) kill.push(k);
+    }
+    kill.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+  }catch(e){}
+  Object.keys(recs).forEach(id=>{
+    if(!/^p[123]-\d{2}$/.test(id)) return;   // faqat mavzu id formatidagi kalitlar
+    const items=recs[id];
+    if(Array.isArray(items) && items.length){
+      try{ localStorage.setItem('recs_'+id, JSON.stringify(items.slice(-12))); }catch(e){}
+    }
+  });
+}
+// localStorage -> bitta obyekt (bulutga yozish uchun)
+function collectState(){
+  return {
+    mockHistory:  safeJSON('mockHistory',[]),
+    mockSavesMeta:safeJSON('mockSavesMeta',[]).slice(0,100),
+    mockDone:     parseInt(safeGet('mockDone','0'))||0,
+    dailyHistory: safeJSON('dailyHistory',[]).slice(0,30),
+    dailyNum:     parseInt(safeGet('dailyNum','1'))||1,
+    streak:       parseInt(safeGet('streak','1'))||1,
+    lastMockIds:  safeJSON('lastMockIds',[]),
+    recs:         collectRecs(),
+    updatedAt:    Date.now()
+  };
+}
+// bulutdagi holatni localStorage'ga qaytarish + UI yangilash
+function applyCloudState(cloud, uid){
+  if(!cloud || typeof cloud!=='object') return;
+  const putJSON=(k,def)=>{ if(cloud[k]===undefined) return; try{ localStorage.setItem(k, JSON.stringify(Array.isArray(def)?(cloud[k]||def):cloud[k])); }catch(e){} };
+  if(Array.isArray(cloud.mockHistory))   putJSON('mockHistory',[]);
+  if(Array.isArray(cloud.mockSavesMeta)) putJSON('mockSavesMeta',[]);
+  if(cloud.mockDone!==undefined)  try{ localStorage.setItem('mockDone', String(parseInt(cloud.mockDone)||0)); }catch(e){}
+  if(Array.isArray(cloud.dailyHistory))  putJSON('dailyHistory',[]);
+  if(cloud.dailyNum!==undefined)  try{ localStorage.setItem('dailyNum', String(parseInt(cloud.dailyNum)||1)); }catch(e){}
+  if(cloud.streak!==undefined)    try{ localStorage.setItem('streak', String(parseInt(cloud.streak)||1)); }catch(e){}
+  if(Array.isArray(cloud.lastMockIds))   putJSON('lastMockIds',[]);
+  applyRecs(cloud.recs);
+  try{ localStorage.setItem('syncUid', uid); localStorage.setItem('syncUpdatedAt', String(cloud.updatedAt||Date.now())); }catch(e){}
+  // global o'zgaruvchilarni yangilab, UI ni qayta chizamiz
+  dailyNum=parseInt(safeGet('dailyNum','1'))||1;
+  streak=parseInt(safeGet('streak','1'))||1;
+  renderDaily();
+  renderMockHistory();
+  updateMockStats();
+}
+function hasLocalUserData(){
+  return (safeJSON('mockHistory',[]).length>0)
+      || (safeJSON('mockSavesMeta',[]).length>0)
+      || (safeJSON('dailyHistory',[]).length>0)
+      || Object.keys(collectRecs()).length>0;
+}
+// debounced push (har bir saqlashda chaqiriladi)
+function queueCloudSave(){
+  if(!authUser || !fbDb) return;
+  try{ localStorage.setItem('syncUpdatedAt', String(Date.now())); }catch(e){}
+  setCloudDot('busy');
+  if(cloudPushTimer) clearTimeout(cloudPushTimer);
+  cloudPushTimer=setTimeout(()=>{ cloudPushTimer=null; pushCloudNow(authUser); }, 1500);
+}
+// localStorage holatini bulutga yozish
+async function pushCloudNow(user){
+  if(!fbDb || !user) return;
+  try{
+    const st=collectState();
+    let payload={ data: st };
+    // Firestore hujjat limiti 1MB — xavfsizlik uchun kesamiz
+    if(JSON.stringify(payload).length>900000){
+      st.recs={}; st.mockSavesMeta=st.mockSavesMeta.slice(-40);
+      payload={ data: st };
+    }
+    await fbDb.collection('users').doc(user.uid).set(payload, {merge:true});
+    try{ localStorage.setItem('syncUid', user.uid); localStorage.setItem('syncUpdatedAt', String(st.updatedAt)); }catch(e){}
+    setCloudDot('ok');
+  }catch(e){
+    console.error('[Cloud] yozish xatosi:', e);
+    setCloudDot('error');
+  }
+}
+// profil maydonlarini yozish (signup'dan keyin)
+async function writeProfileNow(user){
+  if(!fbDb || !user) return;
+  try{
+    await fbDb.collection('users').doc(user.uid).set({
+      displayName: String(user.displayName||'').slice(0,40),
+      email: user.email||'',
+      lastLoginAt: Date.now()
+    }, {merge:true});
+  }catch(e){ console.error('[Cloud] profil yozilmadi:', e); }
+}
+// login bo'lganda: bulut <-> lokalni solishtirib sinxronlaymiz
+async function syncOnLogin(user){
+  if(!fbDb) return;
+  setCloudDot('busy');
+  try{
+    const ref=fbDb.collection('users').doc(user.uid);
+    const snap=await ref.get().catch(()=>null);
+    const localTs=parseInt(safeGet('syncUpdatedAt','0'))||0;
+    const prevUid=safeGet('syncUid','');
+    if(!snap || !snap.exists){
+      // Yangi akkaunt — shu qurilamdagi (mehmon) natijalarni bulutga ko'chiramiz
+      await ref.set({
+        displayName: String(user.displayName||'').slice(0,40),
+        email: user.email||'',
+        createdAt: Date.now(),
+        lastLoginAt: Date.now(),
+        data: collectState()
+      });
+      try{ localStorage.setItem('syncUid', user.uid); localStorage.setItem('syncUpdatedAt', String(Date.now())); }catch(e){}
+      if(hasLocalUserData()) console.info('[Cloud] Lokal natijalar akkauntingizga ko\'chirildi ✓');
+    } else {
+      const doc=snap.data()||{};
+      const cloudData=doc.data||null;
+      const cloudTs=(cloudData && cloudData.updatedAt)||0;
+      // boshqa akkaunt bo'lsa yoki bulut yangiroq bo'lsa — bulut g'olib
+      const cloudWins=(prevUid && prevUid!==user.uid) || cloudTs>localTs;
+      if(cloudData && cloudWins){ applyCloudState(cloudData, user.uid); }
+      else if(cloudData){ await pushCloudNow(user); }           // lokal yangiroq — bulutga push
+      else { await pushCloudNow(user); }                        // bulutda data yo'q — lokalni ko'taramiz
+      await ref.set({
+        lastLoginAt: Date.now(),
+        email: user.email||'',
+        displayName: String(user.displayName||doc.displayName||'').slice(0,40)
+      }, {merge:true});
+    }
+    attachCloudListener(user);
+    setCloudDot('ok');
+  }catch(e){
+    console.error('[Cloud] sinxronizatsiya xatosi:', e);
+    setCloudDot('error');
+  }
+}
+// boshqa qurilmadan o'zgarish bo'lsa — real vaqtda olamiz
+function attachCloudListener(user){
+  if(cloudUnsub){ try{cloudUnsub();}catch(e){} cloudUnsub=null; }
+  if(!fbDb || !user) return;
+  try{
+    cloudUnsub=fbDb.collection('users').doc(user.uid).onSnapshot(snap=>{
+      if(!snap || !snap.exists) return;
+      const cloudData=(snap.data()||{}).data;
+      if(!cloudData) return;
+      const localTs=parseInt(safeGet('syncUpdatedAt','0'))||0;
+      if((cloudData.updatedAt||0) > localTs) applyCloudState(cloudData, user.uid);
+    }, err=>{ console.error('[Cloud] tinglash xatosi:', err); setCloudDot('error'); });
+  }catch(e){ console.error('[Cloud] listener ulanmadi:', e); }
+}
+// sahifa yopilayotganda navbatdagi push'ni yuboramiz
+window.addEventListener('pagehide', ()=>{
+  if(cloudPushTimer){ clearTimeout(cloudPushTimer); cloudPushTimer=null; if(authUser) try{ pushCloudNow(authUser); }catch(e){} }
+});
+// ESC bilan modalni yopish
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    const m=document.getElementById('authModal');
+    if(m && !m.classList.contains('hidden')) closeAuthModal();
+  }
+});
 
 window.router=router; window.toggleTheme=toggleTheme; window.setTheme=setTheme; window.doGlobalSearch=doGlobalSearch;
 window.setPreviewTab=setPreviewTab; window.previewMore=previewMore; window.renderPart=renderPart; window.openTopic=openTopic;
@@ -1156,6 +1633,8 @@ window.closeMockResults=closeMockResults; window.revealMockAnswer=revealMockAnsw
 window.downloadMockReport=downloadMockReport; window.hideMockResults=hideMockResults;
 window.completeDaily=completeDaily; window.skipDaily=skipDaily; window.renderMockHistory=renderMockHistory;
 window.restartDaily=restartDaily; window.resetDailyProgress=resetDailyProgress; window.resetDailyLesson=resetDailyLesson;
+window.openAuthModal=openAuthModal; window.closeAuthModal=closeAuthModal; window.setAuthMode=setAuthMode;
+window.doLogin=doLogin; window.doSignup=doSignup; window.doResetPassword=doResetPassword; window.doLogout=doLogout;
 
 function closeMockResults(){ hideMockResults(); }
 function hideMockResults(){

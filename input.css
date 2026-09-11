@@ -1,3 +1,59 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================================
+   AUTH UI — qo'lda yozilgan uslublar (Tailwind buildida saqlanadi)
+   Login / Sign Up modal, input va tugmalar — light/dark mode
+   ============================================================ */
+.auth-input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.auth-input::placeholder { color: #94a3b8; font-weight: 500; }
+.auth-input:focus {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .1);
+}
+.dark .auth-input {
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(255, 255, 255, .14);
+  color: #f1f5f9;
+}
+.dark .auth-input:focus {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .12);
+}
+
+.auth-btn-primary {
+  width: 100%;
+  border-radius: 9999px;
+  padding: 11px 16px;
+  font-weight: 800;
+  font-size: 13px;
+  background: #0f172a;
+  color: #fff;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.auth-btn-primary:hover { opacity: .9; }
+.auth-btn-primary:active { transform: scale(.98); }
+.auth-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.dark .auth-btn-primary { background: #fff; color: #0f172a; }
+
+.auth-tab-active { background: #0f172a; color: #fff; box-shadow: 0 4px 14px -4px rgba(15,23,42,.4); }
+.dark .auth-tab-active { background: #fff; color: #0f172a; }
+
+/* auth modal ochilish animatsiyasi */
+@keyframes authPop {
+  from { opacity: 0; transform: translateY(14px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+#authPanel { animation: authPop .18s ease-out; }
