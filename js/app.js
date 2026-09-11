@@ -18,10 +18,8 @@ document.addEventListener('visibilitychange', ()=>{
     // pause daily timer to save CPU
     if(dailyRunning){ clearInterval(dailyInterval); dailyInterval=null; }
   } else {
-    if(dailyRunning && !dailyInterval){
-      // resume
-      dailyInterval=setInterval(()=>{ dailyRemaining--; updateDailyTimerUI(); if(dailyRemaining<=0) completeDaily(true); },1000);
-    }
+    // resume
+    if(dailyRunning && !dailyInterval) runDailyInterval();
   }
 });
 
@@ -74,6 +72,11 @@ let recTimer = null;
 let lastBlob = null;
 let lastUrl = null;
 let mockSessionAnswered = 0;
+// per-mock session store: every recording is attached to its question index
+let mockSessionSaves = [];        // [{qIdx, duration, date, url, blob}]
+let mockAnsweredMap = {};         // qIdx -> true (user pressed "Saqlash")
+let mockAnswersMeta = [];         // [{qIdx, part, q, duration, date}]
+let mockRevealAnswer = false;     // Best Answer ko'rsatish (mock davomida yopiq)
 
 // daily
 let dailyInterval = null;
@@ -98,6 +101,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // also expose for router
   window._lazyRest=_lazyRest;
 
+  syncCounts();
   renderDaily();
   renderMockHistory();
   updateMockStats();
@@ -165,9 +169,9 @@ function getVoiceForPref(pref){
   }
 }
 let _lastSpeakAt=0;
-function speak(text, pref, onend){
+function speak(text, pref, onend, maxLen){
   // SECURITY: sanitize speak text (strip tags, limit length)
-  text = sanitizeText(text, 600);
+  text = sanitizeText(text, maxLen || 600);
   if(!text) return null;
   // PERFORMANCE: throttle speak — 400ms anti-spam
   const now=Date.now(); if(now - _lastSpeakAt < 400) speechSynthesis.cancel();
@@ -588,15 +592,23 @@ function startMock(){
   mockIndex=0;
   mockElapsed=0;
   mockSessionAnswered=0;
-  document.getElementById('mockRunner').classList.remove('hidden');
-  try{document.getElementById('mockRunner').scrollIntoView({behavior:'smooth'});}catch(e){}
+  // yangi mock — barcha ro'yxatlar va yozuvlar noldan
+  mockSessionSaves=[];
+  mockAnsweredMap={};
+  mockAnswersMeta=[];
+  mockRevealAnswer=false;
+  const runner=document.getElementById('mockRunner');
+  runner.classList.remove('hidden');
+  hideMockResults();
+  try{runner.scrollIntoView({behavior:'smooth'});}catch(e){}
   renderMockQuestion();
   startMockTimer();
   // save start to history
   const hist=safeJSON('mockHistory',[]);
-  hist.unshift({date:new Date().toISOString(), total:mockQueue.length, status:'started'});
+  hist.unshift({date:new Date().toISOString(), total:mockQueue.length, answered:0, recorded:0, status:'started'});
   safeSet('mockHistory', JSON.stringify(hist.slice(0,20)));
   renderMockHistory();
+  updateMockStats();
 }
 function startMockTimer(){
   clearInterval(mockTimerInterval);
@@ -607,6 +619,17 @@ function startMockTimer(){
     if(mockElapsed>=14*60) { stopMock(); alert('Mock vaqti tugadi (14 min).'); }
   },1000);
 }
+// === MOCK PART META (har bir bo'lim uchun alohida rang/nom) ===
+function mockPartStyle(part){
+  if(part==='Part 1') return {badge:'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/20'};
+  if(part==='Part 2') return {badge:'bg-amber-400 text-slate-900 border border-amber-400'};
+  return {badge:'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20'};
+}
+function fmtDur(sec){
+  sec=Math.max(0, Math.floor(sec||0));
+  return `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
+}
+function mockRec(i){ return mockSessionSaves.find(s=>s.qIdx===i) || null; }
 function renderMockQuestion(){
   const item=mockQueue[mockIndex];
   if(!item) return;
@@ -615,17 +638,74 @@ function renderMockQuestion(){
   document.getElementById('mockQBadge').textContent=`${item.badge} • Q${mockIndex+1}`;
   document.getElementById('mockQuestion').textContent=item.q;
   document.getElementById('mockQHint').textContent=item.hint;
-  document.getElementById('mockBestAnswer').textContent=item.a;
   document.getElementById('mockOverallBar').style.width=`${((mockIndex+1)/mockQueue.length*100).toFixed(0)}%`;
-  document.getElementById('mockSavedList').innerHTML = getMockSavedForCurrent().map(s=>`
-    <div class="flex items-center gap-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2">
-      <span class="w-7 h-7 rounded-full bg-emerald-500 text-white grid place-items-center"><i data-lucide="check" class="w-3.5 h-3.5"></i></span>
-      <div class="flex-1"><div class="text-[12px] font-bold">Saqlangan javob #${s.idx+1}</div><div class="text-[11px] text-slate-500">${new Date(s.date).toLocaleTimeString()} • ${s.duration}s</div></div>
-      <audio src="${s.url}" controls class="w-24 h-7"></audio>
-    </div>
-  `).join('') || `<div class="text-[11px] text-slate-500 text-center py-2">Hali javob saqlanmadi — Record bosing</div>`;
+  renderMockBestAnswer(item);
+  renderMockSavedList();
+  // shu savol uchun oldin yozib olingan bo'lsa — playerni tiklaymiz
+  const pb=document.getElementById('playback');
+  const prev=mockRec(mockIndex);
+  lastBlob=null; lastUrl=null;
+  if(pb){
+    try{ pb.pause(); }catch(e){}
+    if(prev){ pb.src=prev.url; pb.classList.remove('hidden'); lastBlob=prev.blob; lastUrl=prev.url; }
+    else { pb.removeAttribute('src'); pb.classList.add('hidden'); }
+  }
+  const st=document.getElementById('recStatus');
+  if(st){
+    if(prev){ st.textContent='Yozib olingan ✓'; st.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white'; }
+    else if(mockAnsweredMap[mockIndex]){ st.textContent='Saqlangan ✓'; st.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white'; }
+    else { st.textContent='Tayyor'; st.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900'; }
+  }
+  const bt=document.getElementById('recBtn');
+  if(bt) bt.classList.toggle('animate-pulse', false);
   refreshIcons();
   if(autoPlay) setTimeout(()=> playMockQuestion(), 400);
+}
+// Best Answer — mock davomida yopiq, topshirilgandan keyin ochiladi
+function renderMockBestAnswer(item){
+  const box=document.getElementById('mockBestAnswer');
+  const locked=document.getElementById('mockBestAnswerLocked');
+  const btn=document.getElementById('mockRevealBtn');
+  if(box) box.textContent=item.a||'';
+  if(!box||!locked) return;
+  if(mockRevealAnswer){
+    box.classList.remove('hidden'); locked.classList.add('hidden');
+    if(btn) btn.textContent='Yashirish';
+  } else {
+    box.classList.add('hidden'); locked.classList.remove('hidden');
+    if(btn) btn.textContent='Ko‘rsatish';
+  }
+}
+function revealMockAnswer(force){
+  mockRevealAnswer = (typeof force==='boolean') ? force : !mockRevealAnswer;
+  const item=mockQueue[mockIndex];
+  if(item) renderMockBestAnswer(item);
+}
+// Har bir bo'lim (Part) uchun alohida ro'yxat — joriy qism ko'rsatiladi
+function renderMockSavedList(){
+  const el=document.getElementById('mockSavedList');
+  const cur=mockQueue[mockIndex];
+  if(!el||!cur) return;
+  const items=mockQueue.map((it,i)=>({it,i})).filter(x=>x.it.part===cur.part);
+  const answered=items.filter(x=>mockAnsweredMap[x.i]).length;
+  const rows=items.map(({i})=>{
+    const s=mockRec(i);
+    return `
+    <div class="flex items-center gap-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2">
+      <span class="w-6 h-6 shrink-0 rounded-full ${s?'bg-emerald-500 text-white':'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300'} grid place-items-center text-[10px] font-extrabold">${i+1}</span>
+      <div class="flex-1 min-w-0">
+        <div class="text-[12px] font-bold truncate">Savol ${i+1}${mockAnsweredMap[i]?' • saqlangan ✓':(s?' • yozilgan':' • yozuv yo‘q')}</div>
+        <div class="text-[11px] text-slate-500">${s? `${fmtDur(s.duration)} • ${new Date(s.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}` : 'tinglash uchun yozuv yo‘q'}</div>
+      </div>
+      ${s? `<audio src="${s.url}" controls preload="none" class="w-[110px] h-7"></audio>` : ''}
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-[11px] font-extrabold tracking-wide ${mockPartStyle(cur.part).badge} px-2 py-1 rounded-full">${escapeHTML(cur.part)} RO‘YXATI</span>
+      <span class="text-[11px] font-bold text-slate-500">${answered} / ${items.length} saqlangan • ${items.filter(x=>mockRec(x.i)).length} audio</span>
+    </div>` + (rows || `<div class="text-[11px] text-slate-500 text-center py-2">Hali javob saqlanmadi — Record bosing</div>`);
+  refreshIcons();
 }
 function playMockQuestion(force){
   const item=mockQueue[mockIndex];
@@ -641,28 +721,34 @@ function nextMockQuestion(){
   if(mockIndex < mockQueue.length-1){
     mockIndex++; renderMockQuestion();
   } else {
-    stopMock();
-    const hist=safeJSON('mockHistory',[]);
-    if(hist[0]) hist[0].status='completed';
-    safeSet('mockHistory', JSON.stringify(hist));
-    renderMockHistory(); updateMockStats();
-    showMockResults();
+    finishMock();
   }
+}
+function finishMock(){
+  // mock yakunlandi — tarixni yangilab, natija + Best Answer ro'yxatlarini chiqaramiz
+  clearInterval(mockTimerInterval); mockTimerInterval=null;
+  const hist=safeJSON('mockHistory',[]);
+  if(hist[0]){
+    hist[0].status='completed';
+    hist[0].answered=mockSessionAnswered;
+    hist[0].recorded=mockSessionSaves.length;
+  }
+  safeSet('mockHistory', JSON.stringify(hist));
+  renderMockHistory(); updateMockStats();
+  stopMock();
 }
 function stopMock(){
   clearInterval(mockTimerInterval); mockTimerInterval=null;
   stopSpeak();
   if(mediaRecorder && mediaRecorder.state==='recording') try{ mediaRecorder.stop(); }catch(e){}
   try{ if(mediaRecorder && mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(tr=>tr.stop()); }catch(e){}
-  try{ if(lastUrl) {} }catch(e){} // keep url for playback, revoke on pagehide
   const runner=document.getElementById('mockRunner');
   if(runner) runner.classList.add('hidden');
   showMockResults();
 }
+// joriy savol uchun yozuvlar (eski API nomi saqlab qolindi)
 function getMockSavedForCurrent(){
-  const all=safeJSON('mockSaves',[]);
-  // we store urls in memory only, so just return empty or from memory
-  return window._mockSavesMem ? window._mockSavesMem.filter(s=> s.mockIdx===mockIndex) : [];
+  return mockSessionSaves.filter(s=> s.qIdx===mockIndex);
 }
 async function toggleRecording(){
   const btn=document.getElementById('recBtn');
@@ -691,10 +777,12 @@ async function toggleRecording(){
       status.textContent='Yozib olindi ✓';
       status.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white';
       stream.getTracks().forEach(t=>t.stop());
-      // store in memory for list
-      if(!window._mockSavesMem) window._mockSavesMem=[];
-      window._mockSavesMem.push({mockIdx:mockIndex, date:new Date().toISOString(), duration: Math.floor((Date.now()-recStart)/1000), url:lastUrl, blob});
-      renderMockQuestion();
+      // FAQAT shu savolga tegishli yozuv sifatida saqlanadi (har bir bo'lim alohida ro'yxat)
+      const rec={qIdx:mockIndex, duration:Math.floor((Date.now()-recStart)/1000), date:new Date().toISOString(), url:lastUrl, blob};
+      mockSessionSaves = mockSessionSaves.filter(s=> s.qIdx!==mockIndex).concat([rec]);
+      renderMockSavedList();
+      const bt=document.getElementById('recBtn');
+      if(bt) bt.classList.remove('animate-pulse');
     };
     mediaRecorder.start();
     recStart=Date.now();
@@ -717,23 +805,31 @@ function playLastRecording(){
   else alert('Avval yozib oling!');
 }
 function saveMockAnswer(){
-  if(!lastBlob){ alert('Avval Record bosing va javob bering!'); return; }
-  const saves=safeJSON('mockSavesMeta',[]);
-  saves.push({q: mockQueue[mockIndex].q, date:new Date().toISOString(), duration: Math.floor((Date.now()-recStart)/1000)});
-  safeSet('mockSavesMeta', JSON.stringify(saves));
-  // history
-  const hist=safeJSON('mockHistory',[]);
-  // update
-  const done=parseInt(safeGet('mockDone')||'0')+1;
+  const item=mockQueue[mockIndex];
+  const rec=mockRec(mockIndex);
+  if(!item || !rec || !rec.blob){ alert('Avval Record bosing va javob bering!'); return; }
+  // joriy sessiya ro'yxati (bo'limlar bo'yicha)
+  mockAnsweredMap[mockIndex]=true;
+  mockAnswersMeta.push({qIdx:mockIndex, part:item.part, q:item.q, duration:rec.duration, date:rec.date});
   mockSessionAnswered++;
-  safeSet('mockDone', String(done));
-  updateMockStats();
-  // download option
-  const a=document.createElement('a');
-  a.href=lastUrl; a.download=`mock-q${mockIndex+1}-${Date.now()}.webm`;
-  // don't auto-download, just show saved
-  document.getElementById('recStatus').textContent='Saqlab qo‘yildi ✓';
-  setTimeout(()=> { document.getElementById('recStatus').textContent='Tayyor'; document.getElementById('recStatus').className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900'; }, 1500);
+  // storage meta
+  const saves=safeJSON('mockSavesMeta',[]);
+  saves.push({q:item.q, part:item.part, date:rec.date, duration:rec.duration});
+  safeSet('mockSavesMeta', JSON.stringify(saves));
+  safeSet('mockDone', String(parseInt(safeGet('mockDone')||'0')+1));
+  const hist=safeJSON('mockHistory',[]);
+  if(hist[0]) hist[0].answered=mockSessionAnswered;
+  safeSet('mockHistory', JSON.stringify(hist));
+  updateMockStats(); renderMockHistory(); renderMockSavedList();
+  const st=document.getElementById('recStatus');
+  if(st){
+    st.textContent='Saqlab qo\u2018yildi \u2713';
+    st.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white';
+  }
+  setTimeout(()=>{
+    const s2=document.getElementById('recStatus');
+    if(s2){ s2.textContent='Tayyor'; s2.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900'; }
+  }, 1500);
   // auto next after 1s
   setTimeout(nextMockQuestion, 900);
 }
@@ -741,49 +837,100 @@ function renderMockHistory(){
   const hist=safeJSON('mockHistory',[]);
   const meta=safeJSON('mockSavesMeta',[]);
   const el=document.getElementById('mockHistory');
+  if(!el) return;
   if(!hist.length && !meta.length){
     el.innerHTML=`<div class="text-[13px] text-slate-500 text-center py-6">Hali mock topshirmadingiz.<br>Birinchi mockni boshlang — natijalar shu yerda saqlanadi.</div>`;
     return;
   }
-  el.innerHTML = (hist.length? hist : [{date:new Date().toISOString(), total:11, status:'completed'}]).slice(0,6).map(h=>`
+  el.innerHTML = (hist.length? hist : [{date:new Date().toISOString(), total:11, status:'completed'}]).slice(0,6).map(h=>{
+    // har bir mock uchun o'z javob soni (avval hamma qatorda bir xil raqam chiqardi)
+    const ans = (typeof h.answered==='number') ? h.answered : (h.status==='completed' ? meta.length : 0);
+    const audio = (typeof h.recorded==='number') ? h.recorded : 0;
+    return `
     <div class="flex items-center gap-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2.5">
-      <div class="w-8 h-8 rounded-full ${h.status==='completed'?'bg-emerald-500':'bg-amber-400'} text-white grid place-items-center"><i data-lucide="${h.status==='completed'?'check':'clock'}" class="w-4 h-4"></i></div>
-      <div class="flex-1">
+      <div class="w-8 h-8 rounded-full ${h.status==='completed'?'bg-emerald-500':'bg-amber-400'} text-white grid place-items-center">${h.overall? `<span class="text-[10px] font-extrabold">${escapeHTML(String(h.overall))}</span>`:`<i data-lucide="${h.status==='completed'?'check':'clock'}" class="w-4 h-4"></i>`}</div>
+      <div class="flex-1 min-w-0">
         <div class="text-[12px] font-bold">${new Date(h.date).toLocaleDateString()} • ${new Date(h.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div>
         <div class="text-[11px] text-slate-500">${h.total||11} savol • ${h.status==='completed'?'Yakunlandi':'Boshlangan'}</div>
       </div>
-      <span class="text-[11px] font-bold bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full">${meta.length} javob</span>
-    </div>
-  `).join('');
+      <span class="text-[11px] font-bold bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full whitespace-nowrap">${ans} javob${audio?` • ${audio} audio`:''}</span>
+    </div>`;
+  }).join('');
   refreshIcons();
-  document.getElementById('mockStatsDone').textContent = meta.length || safeGet('mockDone')||'0';
+  const doneEl=document.getElementById('mockStatsDone');
+  if(doneEl) doneEl.textContent = meta.length || safeGet('mockDone')||'0';
 }
 function clearMockHistory(){
   if(!confirm('Barcha mock tarixini o‘chirishni istaysizmi?')) return;
-  safeSet('mockHistory', null); try{localStorage.removeItem('mockHistory')}catch(e){};
-  try{localStorage.removeItem('mockSavesMeta')}catch(e){};
-  try{localStorage.removeItem('mockDone')}catch(e){};
-  window._mockSavesMem=[];
+  try{ localStorage.removeItem('mockHistory'); localStorage.removeItem('mockSavesMeta'); localStorage.removeItem('mockDone'); }catch(e){}
+  mockSessionSaves=[]; mockAnsweredMap={}; mockAnswersMeta=[]; mockSessionAnswered=0;
   renderMockHistory(); updateMockStats();
 }
 function updateMockStats(){
-  const total = DATA.part1.length+DATA.part2.length+DATA.part3.length;
-  document.getElementById('mockStatsTotal').textContent = (DATA.part1.length*4 + DATA.part2.length + DATA.part3.length*4);
+  const q = (DATA.part1.length*4 + DATA.part2.length + DATA.part3.length*4);
+  const totalEl=document.getElementById('mockStatsTotal');
+  if(totalEl) totalEl.textContent = q;
   const done = safeJSON('mockSavesMeta',[]).length;
   const el=document.getElementById('mockStatsDone');
   if(el) el.textContent=done;
+  syncCounts();
+}
+// Hero/nav ko'rsatkichlarini haqiqiy ma'lumotdan hisoblaymiz (statik "608", "35+" xatolari o'rniga)
+function syncCounts(){
+  const p1=DATA.part1.length, p2=DATA.part2.length, p3=DATA.part3.length;
+  const best = p1*4 + p2 + p3*4;           // har bir savol uchun 1 ta Best Answer
+  const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('navCountP1', p1); set('navCountP2', p2); set('navCountP3', p3);
+  set('mNavCountP1', p1); set('mNavCountP2', p2); set('mNavCountP3', p3);
+  set('heroTopicCount', p1+p2+p3);
+  set('heroBestCount', best);
+  set('heroP1Count', p1); set('heroP1Q', p1*4);
+  set('heroP2Count', p2); set('heroP2Q', p2*4);
+  set('heroP3Count', p3); set('heroP3Q', p3*4);
+  set('mockStatsTotal', best);
+  ['', '2'].forEach(sfx=>{ set('p1HeaderCount'+sfx, p1); set('p2HeaderCount'+sfx, p2); set('p3HeaderCount'+sfx, p3); });
 }
 
-// HERO audio demo
+// HERO audio demo — vaqt va progress haqiqiy o'qilayotgan matnga qarab hisoblanadi
+let heroAudioTimer=null;
 function playHeroAudio(){
-  speak("Describe a person who taught you something important. Who is this person, how do you know this person, what this person taught you, and explain why it was important.", voicePref);
-  let w=36; const intv=setInterval(()=>{
-    w+=4; if(w>100){ clearInterval(intv); w=36; }
-    const el=document.getElementById('heroProgress'); if(el) el.style.width=w+'%';
-  },200);
-  setTimeout(()=> clearInterval(intv), 4000);
+  const text="Describe a person who taught you something important. Who is this person, how do you know this person, what this person taught you, and explain why it was important.";
+  const bar=document.getElementById('heroProgress');
+  const timeEl=document.getElementById('heroAudioTime');
+  if(heroAudioTimer){ clearInterval(heroAudioTimer); heroAudioTimer=null; }
+  // so'z tezligi ~2.6 so'z/sek => umumiy davomiylik taxmini
+  const words=text.trim().split(/\s+/).length;
+  const total=Math.max(4, Math.round(words/2.6));
+  let elapsed=0;
+  if(bar){ bar.style.width='0%'; }
+  const render=()=>{
+    const m=String(Math.floor(elapsed/60)).padStart(1,'0'), sec=String(elapsed%60).padStart(2,'0');
+    const tm=String(Math.floor(total/60)).padStart(1,'0'), ts=String(total%60).padStart(2,'0');
+    if(timeEl) timeEl.textContent=`${m}:${sec} / ${tm}:${ts}`;
+    if(bar) bar.style.width=Math.min(100, elapsed/total*100).toFixed(0)+'%';
+  };
+  render();
+  const btn=document.getElementById('heroPlayBtn');
+  if(btn) btn.innerHTML='<i data-lucide="pause" class="w-4 h-4"></i>';
+  refreshIcons();
+  heroAudioTimer=setInterval(()=>{
+    elapsed++;
+    if(elapsed>=total){ clearInterval(heroAudioTimer); heroAudioTimer=null; }
+    render();
+  },1000);
+  const reset=()=>{
+    if(heroAudioTimer){ clearInterval(heroAudioTimer); heroAudioTimer=null; }
+    if(bar) bar.style.width='0%';
+    if(timeEl) timeEl.textContent=`0:00 / 0:${String(total).padStart(2,'0')}`;
+    if(btn) btn.innerHTML='<i data-lucide="play" class="w-4 h-4 fill-current"></i>';
+    refreshIcons();
+  };
+  speak(text, voicePref, reset);
+  // xavfsizlik: nutq tugamasa ham 2x vaqtdan keyin reset
+  setTimeout(()=>{ if(heroAudioTimer && elapsed>=total*2) reset(); }, (total*2+2)*1000);
 }
 
+// DAILY
 // DAILY
 function renderDaily(){
   document.getElementById('dailyNum').textContent=String(dailyNum).padStart(2,'0');
@@ -860,10 +1007,21 @@ function renderDaily(){
   updateDailyTimerUI();
 }
 function updateDailyTimerUI(){
-  const m=String(Math.floor(dailyRemaining/60)).padStart(2,'0'), s=String(dailyRemaining%60).padStart(2,'0');
-  document.getElementById('dailyTimer').textContent=`${m}:${s}`;
-  document.getElementById('dailyProgress').style.width=`${(1 - dailyRemaining/(20*60))*100}%`;
-  document.getElementById('autoNextLabel').textContent = dailyRunning ? `${m}:${s} dan so'ng auto` : `20:00 dan so'ng`;
+  const m=String(Math.floor(Math.max(0,dailyRemaining)/60)).padStart(2,'0'), s=String(Math.max(0,dailyRemaining)%60).padStart(2,'0');
+  const t=document.getElementById('dailyTimer'); if(t) t.textContent=`${m}:${s}`;
+  const p=document.getElementById('dailyProgress'); if(p) p.style.width=`${Math.min(100,(1 - dailyRemaining/(20*60))*100)}%`;
+  const a=document.getElementById('autoNextLabel'); if(a) a.textContent = dailyRunning ? `${m}:${s} dan so'ng auto` : `${m}:${s}`;
+  const btn=document.getElementById('dailyToggle');
+  if(btn && !dailyRunning) btn.className='w-20 bg-emerald-500 text-white rounded-full py-1.5 text-[12px] font-bold';
+}
+// bitta joydan boshqariladigan taymer (visibility/fokus bilan ham mos)
+function runDailyInterval(){
+  clearInterval(dailyInterval);
+  dailyInterval=setInterval(()=>{
+    dailyRemaining--;
+    updateDailyTimerUI();
+    if(dailyRemaining<=0) completeDaily(true);
+  },1000);
 }
 function toggleDaily(){
   if(dailyRunning){ pauseDaily(); } else { startDaily(); }
@@ -871,24 +1029,59 @@ function toggleDaily(){
 function startDaily(){
   if(dailyRunning) return;
   dailyRunning=true;
-  document.getElementById('dailyToggle').textContent='Pauza';
-  document.getElementById('dailyToggle').className='mt-2 w-20 bg-amber-400 text-slate-900 rounded-full py-1.5 text-[12px] font-bold';
-  dailyInterval=setInterval(()=>{
-    dailyRemaining--;
-    updateDailyTimerUI();
-    if(dailyRemaining<=0){
-      completeDaily(true);
-    }
-  },1000);
+  const btn=document.getElementById('dailyToggle');
+  if(btn){ btn.textContent='Pauza'; btn.className='w-20 bg-amber-400 text-slate-900 rounded-full py-1.5 text-[12px] font-bold'; }
+  runDailyInterval();
 }
 function pauseDaily(){
   dailyRunning=false;
-  clearInterval(dailyInterval);
-  document.getElementById('dailyToggle').textContent='Davom ettirish';
-  document.getElementById('dailyToggle').className='mt-2 w-20 bg-emerald-500 text-white rounded-full py-1.5 text-[12px] font-bold';
+  clearInterval(dailyInterval); dailyInterval=null;
+  const btn=document.getElementById('dailyToggle');
+  if(btn){ btn.textContent='Davom ettirish'; btn.className='w-20 bg-emerald-500 text-white rounded-full py-1.5 text-[12px] font-bold'; }
+}
+// === RESTART: joriy 20 daqiqalik darsni boshidan boshlash ===
+function restartDaily(){
+  clearInterval(dailyInterval); dailyInterval=null;
+  dailyRemaining=20*60;
+  dailyRunning=false;
+  updateDailyTimerUI();
+  const btn=document.getElementById('dailyToggle');
+  if(btn){ btn.textContent='Pauza'; }
+  renderDailyTopicsInfo();
+  startDaily();                        // darhol qayta ishga tushadi
+  const note=document.getElementById('dailyRestartNote');
+  if(note){
+    note.textContent=`Dars qaytadan boshlandi • 20:00 (Dars #${String(dailyNum).padStart(2,'0')})`;
+    note.classList.remove('hidden');
+    setTimeout(()=>note.classList.add('hidden'), 4000);
+  }
+}
+// === TO'LIQ RESET: dars raqami 01 dan, streak qaytadan ===
+function resetDailyProgress(){
+  if(!confirm('Daily progress noldan boshlansinmi? (dars #01, timer 20:00, 7 kunlik reja yangilanadi)')) return;
+  clearInterval(dailyInterval); dailyInterval=null;
+  dailyRunning=false;
+  dailyNum=1; streak=1;
+  safeSet('dailyNum','1'); safeSet('streak','1');
+  try{ localStorage.removeItem('dailyHistory'); }catch(e){}
+  dailyRemaining=20*60;
+  renderDaily();
+  const btn=document.getElementById('dailyToggle');
+  if(btn){ btn.textContent='Boshlash'; btn.className='w-20 bg-emerald-500 text-white rounded-full py-1.5 text-[12px] font-bold'; }
+  const note=document.getElementById('dailyRestartNote');
+  if(note){ note.textContent='Hammasi noldan: Dars #01 tayyor • 20:00'; note.classList.remove('hidden'); setTimeout(()=>note.classList.add('hidden'), 4000); }
+}
+// faqat mavzu nomlarini yangilab beradi (restart paytida dars almashmasligi uchun)
+function renderDailyTopicsInfo(){
+  const el=document.getElementById('todayTopicName');
+  if(!el) return;
+  const p1 = DATA.part1[(dailyNum*7) % DATA.part1.length];
+  const p2 = DATA.part2[(dailyNum*13) % DATA.part2.length];
+  const p3 = DATA.part3[(dailyNum*5) % DATA.part3.length];
+  el.textContent = `${p1.title} + ${p2.title.slice(0,32)}... + ${p3.title}`;
 }
 function completeDaily(auto){
-  clearInterval(dailyInterval);
+  clearInterval(dailyInterval); dailyInterval=null;
   dailyRunning=false;
   const p1 = DATA.part1[(dailyNum*7) % DATA.part1.length];
   const hist=safeJSON('dailyHistory',[]);
@@ -901,7 +1094,8 @@ function completeDaily(auto){
   safeSet('streak', String(streak));
   dailyRemaining=20*60;
   renderDaily();
-  document.getElementById('dailyToggle').textContent='Boshlash';
+  const tgl=document.getElementById('dailyToggle');
+  if(tgl){ tgl.textContent='Boshlash'; tgl.className='w-20 bg-emerald-500 text-white rounded-full py-1.5 text-[12px] font-bold'; }
   if(auto){
     alert('20 daqiqa tugadi — keyingi mavzuga avtomatik o‘tdingiz! Davom eting.');
     setTimeout(startDaily, 800);
@@ -913,6 +1107,7 @@ function skipDaily(){
   if(!confirm('Keyingi mavzuga o‘tishni istaysizmi? Joriy dars yakunlangan deb hisoblanadi.')) return;
   completeDaily(false);
 }
+function resetDailyLesson(){ restartDaily(); }
 
 // SETTINGS modal
 function openSettings(){ document.getElementById('settingsModal').classList.remove('hidden'); document.body.style.overflow='hidden'; refreshIcons(); }
@@ -928,16 +1123,22 @@ window.toggleMobileMenu=toggleMobileMenu; window.filterPart2=filterPart2; window
 window.playHeroAudio=playHeroAudio; window.startMock=startMock; window.stopMock=stopMock; window.nextMockQuestion=nextMockQuestion;
 window.playMockQuestion=playMockQuestion; window.toggleRecording=toggleRecording; window.playLastRecording=playLastRecording;
 window.saveMockAnswer=saveMockAnswer; window.clearMockHistory=clearMockHistory; window.toggleDaily=toggleDaily;
-window.closeMockResults=closeMockResults;
+window.closeMockResults=closeMockResults; window.revealMockAnswer=revealMockAnswer; window.speakMockBestAnswer=speakMockBestAnswer;
+window.downloadMockReport=downloadMockReport; window.hideMockResults=hideMockResults;
 window.completeDaily=completeDaily; window.skipDaily=skipDaily; window.renderMockHistory=renderMockHistory;
+window.restartDaily=restartDaily; window.resetDailyProgress=resetDailyProgress; window.resetDailyLesson=resetDailyLesson;
 
-function closeMockResults(){ const el=document.getElementById('mockResults'); if(el) el.classList.add('hidden'); }
+function closeMockResults(){ hideMockResults(); }
+function hideMockResults(){
+  const el=document.getElementById('mockResults');
+  if(el) el.classList.add('hidden');
+}
 function roundHalf(n){ return (Math.round(n*2)/2).toFixed(1); }
 function showMockResults(){
-  const saves = safeJSON('mockSavesMeta',[]);
+  const meta = safeJSON('mockSavesMeta',[]);
   const total = mockQueue.length;
-  // count only saves from current mock session (use mockElapsed and last saves? For now use total saves but limit to total)
   const answered = mockSessionAnswered; // per-mock session, resets each mock
+  const recorded = mockSessionSaves.length;
   // IELTS scoring: 0.5 increments, 0 if no answers
   let flu, lex, gram, pron, overall;
   const ratio = total ? answered/total : 0;
@@ -966,6 +1167,8 @@ function showMockResults(){
   document.getElementById('resPron').textContent = pron;
   document.getElementById('resTotal').textContent = `${answered} / ${total} javob`;
   document.getElementById('resTime').textContent = `${Math.floor(mockElapsed/60)}:${String(mockElapsed%60).padStart(2,'0')}`;
+  const recEl=document.getElementById('resAudioCount');
+  if(recEl) recEl.textContent = `${recorded} audio yozuv`;
   // feedback - handle 0 and realistic
   const feedback = [];
   if(answered === 0){
@@ -983,9 +1186,97 @@ function showMockResults(){
     if(ratio < 1) feedback.push(`• To'liqlik: ${answered}/${total} savolga javob berdingiz — barchasini javob bersangiz +1.0 ball ko'tariladi.`);
   }
   document.getElementById('resFeedback').innerHTML = feedback.map(f=>`<div class="text-[13px] leading-5">${f}</div>`).join('');
+  // === HAR BIR BO'LIM UCHUN ALOHIDA RO'YXAT: savol + sizning audio javobingiz + Best Answer ===
+  renderMockResultsByPart();
   // save overall
   const hist2 = safeJSON('mockHistory',[]);
-  if(hist2[0]) { hist2[0].overall = overall; hist2[0].breakdown = {flu, lex, gram, pron}; safeSet('mockHistory', JSON.stringify(hist2)); renderMockHistory(); }
+  if(hist2[0]) { hist2[0].overall = overall; hist2[0].breakdown = {flu, lex, gram, pron}; hist2[0].answered = answered; hist2[0].recorded = recorded; safeSet('mockHistory', JSON.stringify(hist2)); renderMockHistory(); }
   refreshIcons();
 }
 
+// === Natija: Part 1 / Part 2 / Part 3 — har biri o'z ro'yxatida ===
+function mockResultRow(it,i){
+  const s=mockRec(i);
+  const answered=!!mockAnsweredMap[i];
+  const style=mockPartStyle(it.part);
+  return `
+  <article class="p-4 sm:p-5 bg-white dark:bg-[#111A33]">
+    <div class="flex items-start gap-3">
+      <span class="shrink-0 w-8 h-8 rounded-full ${answered?'bg-emerald-500 text-white':'bg-slate-900 dark:bg-white text-white dark:text-slate-900'} grid place-items-center text-[12px] font-extrabold">${i+1}</span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-[10px] font-extrabold tracking-wide px-2 py-0.5 rounded-full ${style.badge}">${escapeHTML(it.badge)}</span>
+          ${s? `<span class="text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full">🎙 ${fmtDur(s.duration)} yozuv</span>`:''}
+          ${answered? '<span class="text-[10px] font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-2 py-0.5 rounded-full">Saqlangan ✓</span>' : '<span class="text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20 px-2 py-0.5 rounded-full">Javob berilmagan</span>'}
+        </div>
+        <h5 class="mt-2 font-semibold text-[14px] leading-6">${escapeHTML(it.q)}</h5>
+        ${s? `<div class="mt-2"><audio src="${s.url}" controls preload="metadata" class="w-full max-w-[340px] h-9"></audio></div>` : `<div class="mt-2 text-[12px] text-slate-500 italic">Bu savolga yozuv yo'q — keyingi mockda mikrofonni yoqib javob bering.</div>`}
+        <div class="mt-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-[10px] font-extrabold tracking-widest text-emerald-600 dark:text-emerald-400">BEST ANSWER • BAND 8-9</div>
+            <button onclick="speakMockBestAnswer(${i})" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-2.5 py-1 text-[11px] font-bold inline-flex items-center gap-1.5"><i data-lucide="volume-2" class="w-3 h-3"></i> Eshitish</button>
+          </div>
+          <p class="mt-1.5 text-[13px] leading-6 whitespace-pre-wrap">${escapeHTML(it.a||'')}</p>
+          ${it.hint? `<div class="mt-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-[11px] leading-5"><b>Tip:</b> ${escapeHTML(it.hint)}</div>`:''}
+        </div>
+      </div>
+    </div>
+  </article>`;
+}
+function renderMockResultsByPart(){
+  const el=document.getElementById('mockResultsByPart');
+  if(!el) return;
+  const parts=['Part 1','Part 2','Part 3'];
+  const html = parts.map(part=>{
+    const items=mockQueue.map((it,i)=>({it,i})).filter(x=>x.it.part===part);
+    if(!items.length) return '';
+    const recs=items.filter(x=>mockRec(x.i)).length;
+    const ans=items.filter(x=>mockAnsweredMap[x.i]).length;
+    const style=mockPartStyle(part);
+    return `
+    <section class="rounded-[20px] border border-slate-200 dark:border-white/10 overflow-hidden bg-slate-50/60 dark:bg-white/[0.02]">
+      <header class="px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-slate-100/70 dark:bg-white/[0.04] border-b border-slate-200 dark:border-white/10">
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] font-extrabold tracking-wide px-2 py-1 rounded-full ${style.badge}">${escapeHTML(part)}</span>
+          <b class="text-[13px]">${part} — ${items.length} savol</b>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] font-bold bg-emerald-500 text-white px-2 py-1 rounded-full">${ans} javob saqlangan</span>
+          <span class="text-[11px] font-bold bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full">${recs} audio yozuv</span>
+        </div>
+      </header>
+      <div class="divide-y divide-slate-200 dark:divide-white/10">${items.map(x=>mockResultRow(x.it,x.i)).join('')}</div>
+    </section>`;
+  }).join('');
+  el.innerHTML = html || `<div class="text-[13px] text-slate-500 text-center py-6">Bu mockda savollar yo'q.</div>`;
+  refreshIcons();
+}
+function speakMockBestAnswer(i){
+  const it=mockQueue[i];
+  if(!it) return;
+  speak(it.a||'', voicePref, null, 1600);
+}
+// natijani matn ko'rinishida yuklab olish (bo'limlar bo'yicha)
+function downloadMockReport(){
+  const parts=['Part 1','Part 2','Part 3'];
+  const lines=[`IELTS SPEAKING MOCK HISOBOTI — ${new Date().toLocaleString()}`,`Umumiy: ${document.getElementById('resOverall').textContent} • ${mockSessionAnswered}/${mockQueue.length} javob • ${mockSessionSaves.length} audio yozuv`,''];
+  parts.forEach(part=>{
+    const items=mockQueue.map((it,i)=>({it,i})).filter(x=>x.it.part===part);
+    if(!items.length) return;
+    lines.push(`========== ${part} (${items.length} savol) ==========`,'');
+    items.forEach(({it,i})=>{
+      const s=mockRec(i);
+      lines.push(`Q${i+1}. ${it.q}`);
+      lines.push(`Sizning javobingiz: ${s? `${fmtDur(s.duration)} audio yozuv (${mockAnsweredMap[i]?'saqlangan':'yozilgan'})` : 'yozuv yo\'q'}`);
+      lines.push(`Best Answer: ${it.a||''}`);
+      if(it.hint) lines.push(`Tip: ${it.hint}`);
+      lines.push('');
+    });
+  });
+  const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`ielts-mock-hisobot-${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
+}
