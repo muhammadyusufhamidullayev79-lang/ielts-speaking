@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/progress/{key} {
+      function owner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      function validKey() {
+        return key in ['mockHistory', 'mockSavesMeta', 'mockDone', 'lastMockIds',
+                       'dailyNum', 'streak', 'dailyHistory', 'completedTopics']
+          || key.matches('recs_[a-zA-Z0-9_-]+');
+      }
+      allow read, delete: if owner();
+      allow create, update: if owner() && validKey()
+        && request.resource.data.keys().hasOnly(['value'])
+        && request.resource.data.value is string
+        && request.resource.data.value.size() < 800000;
+    }
+    // Everything else, including other users and unknown collections, is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

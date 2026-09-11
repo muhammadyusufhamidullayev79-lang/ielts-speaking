@@ -7,7 +7,7 @@
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta http-equiv="Permissions-Policy" content="microphone=(self), camera=(), geolocation=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; media-src 'self' blob: data: https:; connect-src 'self' https: data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://unpkg.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; media-src 'self' blob: data: https:; connect-src 'self' https: data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
 <title>IELTS Speaking Pro — 9.0 sari professional tayyorgarlik</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
 <link rel="apple-touch-icon" href="assets/logo.png">
@@ -61,6 +61,11 @@ html.dark { color-scheme: dark; }
           <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
           <input id="globalSearch" placeholder="Mavzu qidirish — masalan, hometown, music..." maxlength="80" autocomplete="off" spellcheck="false" inputmode="search" class="bg-transparent outline-none text-[13px] w-[260px] placeholder:text-slate-400">
           <button onclick="doGlobalSearch()" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full w-7 h-7 grid place-items-center"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
+        </div>
+        <div id="accountControls" class="account-controls">
+          <button id="accountButton" onclick="openAuth()" class="account-button">Kirish / Ro'yxatdan o'tish</button>
+          <button id="logoutButton" onclick="logoutAccount()" class="account-button" hidden>Chiqish</button>
+          <span id="accountNotice" class="account-notice" role="status"></span>
         </div>
         <button onclick="toggleTheme()" class="w-9 h-9 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 grid place-items-center hover:scale-105 transition">
           <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
@@ -716,6 +721,41 @@ html.dark { color-scheme: dark; }
   </div>
 </footer>
 
+<!-- Firebase Console → Project settings → Your apps → Web app configuration.
+     Public web config only: never put service-account/private keys here. -->
+<script>
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCOyhVJPvF18LKVfzjUIhdW_VvpldmkrYA",
+  authDomain: "ielts-speaking-57c6a.firebaseapp.com",
+  projectId: "ielts-speaking-57c6a",
+  storageBucket: "ielts-speaking-57c6a.firebasestorage.app",
+  messagingSenderId: "989093517071",
+  appId: "1:989093517071:web:68cb351d0cfa317fa6507a",
+  measurementId: "G-0LJ63H3M84"
+};
+</script>
+<div id="authModal" class="account-overlay" hidden>
+  <section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle" tabindex="-1">
+    <div class="account-heading"><h2 id="authTitle">Kirish</h2><button type="button" class="account-button" onclick="closeAuth()" aria-label="Yopish">✕</button></div>
+    <p id="accountStatus" role="status" aria-live="polite"></p>
+    <form id="authForm" onsubmit="submitAuth(event)">
+      <label id="authNameLabel" hidden>Ism<input id="authName" autocomplete="name" maxlength="80"></label>
+      <label>Email<input id="authEmail" type="email" autocomplete="email" required maxlength="254"></label>
+      <label id="authPasswordLabel">Parol<input id="authPassword" type="password" autocomplete="current-password" minlength="6" maxlength="128" required></label>
+      <button id="authSubmit" class="account-button account-primary" type="submit">Kirish</button>
+    </form>
+    <div id="authLinks" class="account-links">
+      <button class="account-button" onclick="openAuth('login')">Kirish</button>
+      <button class="account-button" onclick="openAuth('signup')">Ro'yxatdan o'tish</button>
+      <button class="account-button" onclick="openAuth('reset')">Parolni unutdim</button>
+    </div>
+    <div id="accountDetails" hidden>
+      <p id="accountEmail"></p>
+      <button class="account-button" onclick="importLegacyProgress()">Shu qurilmadagi eski natijalarni ko'chirish</button>
+      <div id="accountHistory"></div>
+    </div>
+  </section>
+</div>
 <script src="js/data.js" defer></script>
 <script src="js/app.js" defer></script>
 <noscript><div style="max-width:640px;margin:40px auto;padding:20px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;text-align:center;font-family:system-ui">JavaScript yoqilgan bo'lishi kerak. Iltimos, brauzer sozlamalarida JavaScript-ni yoqing.</div></noscript>

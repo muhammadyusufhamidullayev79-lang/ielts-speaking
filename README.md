@@ -37,3 +37,48 @@ python3 tools/build-standalone.py
   qaytadan boshlaydi, **01** tugmasi butun progressni noldan boshlaydi.
 - **Audio** — ikki AI ovoz (Dilnoza / Jasur), tezlik sozlanadi; barcha sanoq
   ko'rsatkichlari (mavzu/savol/Best Answer soni) `js/data.js` dan avtomatik hisoblanadi.
+
+## Firebase akkaunt tizimini ulash
+
+1. Firebase Console’da loyiha va **Web app** yarating. `index.html` ichidagi
+   `window.FIREBASE_CONFIG` ga shu ilovaning `apiKey`, `authDomain`, `projectId`,
+   `appId` qiymatlarini yozing. Bular ochiq frontend konfiguratsiyasi; **service account
+   yoki private key joylamang**.
+2. Authentication → Sign-in method → **Email/Password** ni yoqing.
+   Settings → Authorized domains ga saytingiz domenini (test uchun preview domenini ham)
+   qo‘shing. Password reset xati shablonini Authentication → Templates’da sozlang.
+3. Firestore Database yarating (production mode). `firestore.rules` ni Console → Rules
+   orqali publish qiling yoki Firebase CLI bilan:
+   `firebase deploy --only firestore:rules --project YOUR_PROJECT_ID`.
+4. Saytni HTTPS orqali oching. Email/parol ro‘yxatdan o‘tishi, kirish, parolni tiklash
+   va chiqishni tekshiring. Firebase konfiguratsiyasi bo‘sh bo‘lsa mavzular ochiq qoladi,
+   lekin login/bulutga saqlash ishlamaydi va modalda tushuntirish chiqadi.
+
+### Saqlash va maxfiylik
+
+- Progress `users/{uid}/progress/{key}` hujjatlarida saqlanadi, `onSnapshot` orqali
+  boshqa qurilmadan ham olinadi. Brauzerda mavzu/dizayn/ovoz sozlamalari o‘zgarishsiz qoladi.
+- Mock tarixi, javoblar metama’lumotlari, Daily tarixi, streak, dars raqami, Daily’da
+  tugallangan mavzu ID’lari va `recs_*` audio tarixi foydalanuvchiga bog‘langan.
+- Eski localStorage natijalari avtomatik ravishda birinchi kirgan odamga berilmaydi:
+  akkaunt nomini bosib **Shu qurilmadagi eski natijalarni ko‘chirish** orqali tasdiqlanadi.
+  Faqat bulutda yo‘q bo‘limlar ko‘chadi; mavjud bulut ma’lumotlari almashtirilmaydi.
+  Eski qurilma nusxasi o‘chirilmaydi.
+- Avvalgi kod audio fayllarini localStorage’da saqlamagan, faqat sana/savol/hajm kabi
+  metama’lumotlarni saqlagan. Ushbu tarix akkaunt modalida ko‘rinadi. Audio **fayllari**
+  qurilmalararo ko‘chirilmaydi (buning uchun alohida Firebase Storage kerak).
+- Mehmonlar barcha mavzu va mashqlarni ochishi mumkin; natija saqlash login talab qiladi.
+  Hisob almashtirilganda joriy sessiya va audio tozalanadi. Bulutga yozish xatosi yashirilmaydi;
+  qayta ulanish/sahifani yangilash talab qilinadi. Offline saqlash kafolatlanmaydi.
+- Bir bo‘lim bir vaqtda ikki qurilmadan tahrirlansa, oxirgi yozuv ustun keladi.
+- `standalone.html` offline nusxasi ataylab qayta yig‘ilmadi; yangi akkaunt tizimi
+  `index.html` orqali ishlaydi.
+
+### Tekshirish ro‘yxati
+
+- Ikki alohida akkaunt: A’da Mock/Daily saqlang, B’da ular ko‘rinmasligini tekshiring.
+- A bilan boshqa brauzer/qurilmadan kirib natijalarni va audio metama’lumotlarini tekshiring.
+- Chiqib, Part 1/2/3 ochilishini va saqlash login modalini ochishini tekshiring.
+- Parol tiklash xatini oling; noto‘g‘ri parol va uzilgan internet holatlarini tekshiring.
+- Firestore Rules Playground’da anonim va boshqa UID bilan read/write rad etilishi,
+  o‘z UID bilan ruxsat berilishi, noma’lum kalit/ortiqcha maydon rad etilishini tekshiring.
