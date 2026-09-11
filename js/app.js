@@ -23,10 +23,46 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
-// safe storage with quota guard
-function safeGet(k, d=null){ try{ const v = localStorage.getItem(k); return v===null ? d : v; }catch(e){ return d; } }
-function safeSet(k, v){ try{ localStorage.setItem(k, v); return true; }catch(e){ if(e && e.name==='QuotaExceededError'){ try{ localStorage.removeItem('mockSavesMeta'); localStorage.removeItem('dailyHistory'); }catch(_){} try{ localStorage.setItem(k, v); return true; }catch(_){} } return false; } }
-function safeJSON(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+// Account progress never falls back to a shared device's localStorage.
+const PROGRESS_KEYS = new Set(['mockHistory','mockSavesMeta','mockDone','lastMockIds','dailyNum','streak','dailyHistory','completedTopics']);
+const isProgressKey = k => PROGRESS_KEYS.has(k) || /^recs_[a-zA-Z0-9_-]+$/.test(k);
+let accountUser = null, accountReady = false, progress = Object.create(null);
+let firebaseAPI, accountAuth, accountDB, unsubscribeProgress, accountEpoch = 0;
+let pendingWrites = 0, authMode = 'login', authBusy = false, authReturnFocus;
+function safeGet(k, d=null){
+  if(isProgressKey(k)) return progress[k] ?? d;
+  try{ return localStorage.getItem(k) ?? d; }catch(e){ return d; }
+}
+function safeJSON(k, d){ try{ return JSON.parse(safeGet(k)) ?? d; }catch(e){ return d; } }
+function safeSet(k, v){
+  if(isProgressKey(k)){
+    if(!accountUser || !accountReady) return false;
+    progress[k] = String(v);
+    persistProgress(k, String(v));
+    return true;
+  }
+  try{ localStorage.setItem(k,v); return true; }catch(e){ return false; }
+}
+function safeRemove(k){ if(isProgressKey(k)) safeSet(k, k==='mockDone' ? '0' : '[]'); else try{localStorage.removeItem(k);}catch(e){} }
+function accountStatus(message){
+  document.getElementById('accountStatus').textContent = message;
+  document.getElementById('accountNotice').textContent = message;
+}
+function persistProgress(key, value){
+  const epoch = accountEpoch;
+  pendingWrites++;
+  accountStatus('Saqlanmoqda…');
+  firebaseAPI.setDoc(firebaseAPI.doc(accountDB,'users',accountUser.uid,'progress',key), {value})
+    .then(()=>{ if(epoch===accountEpoch) accountStatus('Bulutga saqlandi.'); })
+    .catch(()=>{ if(epoch===accountEpoch){ accountReady=false; accountStatus('Saqlanmadi. Internet yoki Firebase ruxsatlarini tekshirib, sahifani yangilang.'); openAuth('account'); } })
+    .finally(()=>{ pendingWrites--; });
+}
+function requireAccount(){
+  if(accountUser && accountReady) return true;
+  openAuth(accountUser ? 'account' : 'login');
+  accountStatus(accountUser ? 'Ma’lumotlar hali yuklanmagan. Ulanishni tekshiring.' : 'Natijani saqlash uchun akkauntingizga kiring.');
+  return false;
+}
 
 // === custom data override (admin panel) ===
 function loadCustomData(){
@@ -87,6 +123,7 @@ let streak = parseInt(safeGet('streak','1'));
 
 document.addEventListener('DOMContentLoaded', ()=>{
   initTheme();
+  initAccount();
   initVoiceUI();
   refreshIcons();
   bindSearches();
@@ -482,16 +519,20 @@ async function toggleRecForQuestion(idx){
     return;
   }
   try{
+    const recordingEpoch=accountEpoch;
+    const recordingTopic=currentModalTopic?.id;
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(recordingEpoch!==accountEpoch){stream.getTracks().forEach(t=>t.stop());return;}
     const rec=new MediaRecorder(stream);
     const chunks=[];
     rec.ondataavailable=e=> chunks.push(e.data);
     rec.onstop=()=>{
+      if(recordingEpoch!==accountEpoch){stream.getTracks().forEach(t=>t.stop());return;}
       const blob=new Blob(chunks,{type:'audio/webm'});
       const url=URL.createObjectURL(blob);
       audio.src=url; audio.classList.remove('hidden'); area.classList.remove('hidden');
       // save
-      saveQRecording(currentModalTopic.id, idx, blob);
+      saveQRecording(recordingTopic, idx, blob);
       stream.getTracks().forEach(t=>t.stop());
     };
     rec.start();
@@ -507,14 +548,12 @@ async function toggleRecForQuestion(idx){
   }catch(e){ alert('Mikrofonga ruxsat bering: '+e.message); }
 }
 function saveQRecording(topicId, qIdx, blob){
+  if(!requireAccount()) return;
   const key='recs_'+topicId;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    const arr=safeJSON(key,[]);
-    arr.push({qIdx, date:new Date().toISOString(), size:blob.size});
-    safeSet(key, JSON.stringify(arr));
-  };
-  reader.readAsDataURL(blob);
+  const arr=safeJSON(key,[]);
+  arr.push({qIdx, date:new Date().toISOString(), size:blob.size});
+  safeSet(key, JSON.stringify(arr.slice(-200)));
+
 }
 async function startRecordingForTopic(){
   // for part2 modal
@@ -524,17 +563,22 @@ async function startRecordingForTopic(){
   const time=document.getElementById('modalRecTime');
   area.classList.remove('hidden');
   try{
+    const recordingEpoch=accountEpoch;
+    const recordingTopic=currentModalTopic?.id;
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(recordingEpoch!==accountEpoch){stream.getTracks().forEach(t=>t.stop());return;}
     const rec=new MediaRecorder(stream);
     const chunks=[];
     const start=Date.now();
     rec.ondataavailable=e=> chunks.push(e.data);
     rec.onstop=()=>{
+      if(recordingEpoch!==accountEpoch){stream.getTracks().forEach(t=>t.stop());return;}
       const blob=new Blob(chunks,{type:'audio/webm'});
       const url=URL.createObjectURL(blob);
       audio.src=url; audio.classList.remove('hidden');
       stream.getTracks().forEach(t=>t.stop());
       clearInterval(window._modalRecIntv);
+      if(recordingTopic) saveQRecording(recordingTopic, 0, blob);
     };
     rec.start();
     window._modalRecorder=rec;
@@ -727,6 +771,7 @@ function nextMockQuestion(){
   }
 }
 function finishMock(){
+  if(!accountUser) requireAccount();
   // mock yakunlandi — tarixni yangilab, natija + Best Answer ro'yxatlarini chiqaramiz
   clearInterval(mockTimerInterval); mockTimerInterval=null;
   const hist=safeJSON('mockHistory',[]);
@@ -766,11 +811,15 @@ async function toggleRecording(){
     return;
   }
   try{
+    const recordingEpoch=accountEpoch;
+    const recordingTopic=currentModalTopic?.id;
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(recordingEpoch!==accountEpoch){stream.getTracks().forEach(t=>t.stop());return;}
     recChunks=[];
     mediaRecorder=new MediaRecorder(stream);
     mediaRecorder.ondataavailable=e=> recChunks.push(e.data);
     mediaRecorder.onstop=()=>{
+      if(recordingEpoch!==accountEpoch){stream.getTracks().forEach(t=>t.stop());return;}
       const blob=new Blob(recChunks,{type:'audio/webm'});
       lastBlob=blob;
       lastUrl=URL.createObjectURL(blob);
@@ -807,17 +856,19 @@ function playLastRecording(){
   else alert('Avval yozib oling!');
 }
 function saveMockAnswer(){
+  if(!requireAccount()) return;
   const item=mockQueue[mockIndex];
   const rec=mockRec(mockIndex);
   if(!item || !rec || !rec.blob){ alert('Avval Record bosing va javob bering!'); return; }
   // joriy sessiya ro'yxati (bo'limlar bo'yicha)
+  if(mockAnsweredMap[mockIndex]) return;
   mockAnsweredMap[mockIndex]=true;
   mockAnswersMeta.push({qIdx:mockIndex, part:item.part, q:item.q, duration:rec.duration, date:rec.date});
   mockSessionAnswered++;
   // storage meta
   const saves=safeJSON('mockSavesMeta',[]);
   saves.push({q:item.q, part:item.part, date:rec.date, duration:rec.duration});
-  safeSet('mockSavesMeta', JSON.stringify(saves));
+  safeSet('mockSavesMeta', JSON.stringify(saves.slice(-200)));
   safeSet('mockDone', String(parseInt(safeGet('mockDone')||'0')+1));
   const hist=safeJSON('mockHistory',[]);
   if(hist[0]) hist[0].answered=mockSessionAnswered;
@@ -833,7 +884,8 @@ function saveMockAnswer(){
     if(s2){ s2.textContent='Tayyor'; s2.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900'; }
   }, 1500);
   // auto next after 1s
-  setTimeout(nextMockQuestion, 900);
+  const savedEpoch=accountEpoch;
+  setTimeout(()=>{if(savedEpoch===accountEpoch) nextMockQuestion();}, 900);
 }
 function renderMockHistory(){
   const hist=safeJSON('mockHistory',[]);
@@ -863,8 +915,9 @@ function renderMockHistory(){
   if(doneEl) doneEl.textContent = meta.length || safeGet('mockDone')||'0';
 }
 function clearMockHistory(){
+  if(!requireAccount()) return;
   if(!confirm('Barcha mock tarixini o‘chirishni istaysizmi?')) return;
-  try{ localStorage.removeItem('mockHistory'); localStorage.removeItem('mockSavesMeta'); localStorage.removeItem('mockDone'); }catch(e){}
+  ['mockHistory','mockSavesMeta','mockDone'].forEach(safeRemove);
   mockSessionSaves=[]; mockAnsweredMap={}; mockAnswersMeta=[]; mockSessionAnswered=0;
   renderMockHistory(); updateMockStats();
 }
@@ -1087,12 +1140,13 @@ function restartDaily(){
 }
 // === TO'LIQ RESET: dars raqami 01 dan, streak qaytadan ===
 function resetDailyProgress(){
+  if(!requireAccount()) return;
   if(!confirm('Daily progress noldan boshlansinmi? (dars #01, timer 20:00, 7 kunlik reja yangilanadi)')) return;
   clearInterval(dailyInterval); dailyInterval=null;
   dailyRunning=false;
   dailyNum=1; streak=1;
   safeSet('dailyNum','1'); safeSet('streak','1');
-  try{ localStorage.removeItem('dailyHistory'); }catch(e){}
+  safeRemove('dailyHistory'); safeRemove('completedTopics');
   dailyRemaining=20*60;
   renderDaily();
   const btn=document.getElementById('dailyToggle');
@@ -1110,12 +1164,16 @@ function renderDailyTopicsInfo(){
   el.textContent = `${p1.title} + ${p2.title.slice(0,32)}... + ${p3.title}`;
 }
 function completeDaily(auto){
+  if(!requireAccount()){ clearInterval(dailyInterval); dailyInterval=null; dailyRunning=false; return; }
   clearInterval(dailyInterval); dailyInterval=null;
   dailyRunning=false;
   const p1 = DATA.part1[(dailyNum*7) % DATA.part1.length];
   const hist=safeJSON('dailyHistory',[]);
   hist.unshift({num:dailyNum, title:p1.title, date:new Date().toISOString(), duration: auto?'20:00 auto': `${20*60 - dailyRemaining} sec`});
   safeSet('dailyHistory', JSON.stringify(hist.slice(0,20)));
+  const completed = new Set(safeJSON('completedTopics', []));
+  ['part1','part2','part3'].forEach((part,i)=>completed.add(part+':'+DATA[part][(dailyNum*[7,13,5][i]) % DATA[part].length].id));
+  safeSet('completedTopics', JSON.stringify([...completed]));
   // next lesson
   dailyNum++;
   streak++;
@@ -1308,4 +1366,159 @@ function downloadMockReport(){
   a.href=url; a.download=`ielts-mock-hisobot-${new Date().toISOString().slice(0,10)}.txt`;
   a.click();
   setTimeout(()=>URL.revokeObjectURL(url), 3000);
+}
+
+// === Firebase Authentication + per-user Firestore progress ===
+async function initAccount(){
+  const modal=document.getElementById('authModal');
+  modal.addEventListener('click', e=>{ if(e.target===modal) closeAuth(); });
+  modal.addEventListener('keydown', e=>{
+    if(e.key==='Escape') closeAuth();
+    if(e.key==='Tab'){
+      const nodes=[...modal.querySelectorAll('button,input,[tabindex]')].filter(el=>!el.disabled && el.getClientRects().length);
+      const first=nodes[0], last=nodes[nodes.length-1];
+      if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  });
+  window.addEventListener('beforeunload', e=>{if(pendingWrites){e.preventDefault();e.returnValue='';}});
+  const config=window.FIREBASE_CONFIG;
+  if(!config?.apiKey || !config?.projectId){ accountStatus('Firebase hali sozlanmagan. Loyiha sozlamalarini kiriting.'); return; }
+  try{
+    const base='https://www.gstatic.com/firebasejs/12.2.1/';
+    const [app,auth,db]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
+    firebaseAPI={...auth,...db};
+    const instance=app.initializeApp(config);
+    accountAuth=auth.getAuth(instance); accountDB=db.getFirestore(instance);
+    await auth.setPersistence(accountAuth,auth.browserLocalPersistence);
+    auth.onAuthStateChanged(accountAuth, user=>{
+      accountEpoch++;
+      if(unsubscribeProgress) unsubscribeProgress();
+      accountReady=false; accountUser=user; progress=Object.create(null);
+      // Discard session data on identity changes; never attach another user's work.
+      clearInterval(mockTimerInterval); mockTimerInterval=null;
+      clearInterval(dailyInterval); dailyInterval=null; dailyRunning=false; dailyRemaining=1200;
+      if(mediaRecorder){ mediaRecorder.onstop=null; try{mediaRecorder.stop();}catch(e){} mediaRecorder.stream?.getTracks().forEach(t=>t.stop()); }
+      clearInterval(recTimer);
+      // Disable recording callbacks before stopping: no previous account writes.
+      [window._modalRecorder,...Object.values(qRecState).map(s=>s.recorder)].filter(Boolean).forEach(rec=>{
+        rec.onstop=null; try{rec.stop();}catch(e){} rec.stream?.getTracks().forEach(t=>t.stop());
+      });
+      qRecState={}; clearInterval(window._modalRecIntv);
+      closeTopic();
+      mockSessionSaves.forEach(r=>revokeBlobUrl(r.url));
+      mockSessionSaves=[]; mockAnsweredMap={}; mockAnswersMeta=[]; mockSessionAnswered=0; mockQueue=[];
+      lastBlob=null; revokeBlobUrl(lastUrl); lastUrl=null;
+      const playback=document.getElementById('playback'); if(playback) playback.removeAttribute('src');
+      document.getElementById('mockRunner')?.classList.add('hidden'); hideMockResults();
+      document.getElementById('mockSavedList').innerHTML='';
+      document.getElementById('mockResultsByPart').innerHTML='';
+      refreshAccountProgress(); updateAccountControls();
+      if(!user){accountStatus('Natijalarni saqlash uchun kiring.');return;}
+      accountStatus('Ma’lumotlar yuklanmoqda…');
+      const epoch=accountEpoch;
+      unsubscribeProgress=db.onSnapshot(db.collection(accountDB,'users',user.uid,'progress'), {includeMetadataChanges:true}, snapshot=>{
+        if(epoch!==accountEpoch) return;
+        // Wait for server confirmation before enabling writes on a new device.
+        if(snapshot.metadata.fromCache && !accountReady) return;
+        progress=Object.create(null);
+        snapshot.forEach(doc=>{ if(isProgressKey(doc.id) && typeof doc.data().value==='string') progress[doc.id]=doc.data().value; });
+        accountReady=true; refreshAccountProgress();
+        if(!snapshot.metadata.hasPendingWrites) accountStatus('Akkaunt ma’lumotlari sinxronlandi.');
+      }, ()=>{ if(epoch===accountEpoch){accountReady=false;accountStatus('Firestore bilan ulanishda xato. Internet va Security Rules sozlamalarini tekshiring.');} });
+    });
+  }catch(e){ accountStatus('Firebase ishga tushmadi. Sozlamalar va internetni tekshiring.'); }
+}
+function refreshAccountProgress(){
+  dailyNum=parseInt(safeGet('dailyNum','1')) || 1;
+  streak=parseInt(safeGet('streak','1')) || 1;
+  if(!dailyRunning) renderDaily();
+  renderMockHistory(); updateMockStats(); renderAccountHistory();
+}
+function updateAccountControls(){
+  const button=document.getElementById('accountButton');
+  button.textContent=accountUser ? (accountUser.displayName || accountUser.email) : "Kirish / Ro'yxatdan o'tish";
+  button.title=button.textContent;
+  document.getElementById('logoutButton').hidden=!accountUser;
+  if(!document.getElementById('authModal').hidden) openAuth(accountUser?'account':'login');
+}
+function openAuth(mode){
+  if(authBusy) return;
+  authMode=accountUser?'account':(mode==='signup'||mode==='reset'?mode:'login');
+  const modal=document.getElementById('authModal');
+  if(modal.hidden) authReturnFocus=document.activeElement;
+  modal.hidden=false;
+  document.getElementById('authTitle').textContent={login:'Kirish',signup:"Ro'yxatdan o'tish",reset:'Parolni tiklash',account:'Akkaunt'}[authMode];
+  document.getElementById('authForm').hidden=authMode==='account';
+  document.getElementById('authLinks').hidden=authMode==='account';
+  document.getElementById('accountDetails').hidden=authMode!=='account';
+  document.getElementById('accountEmail').textContent=accountUser?.email || '';
+  document.getElementById('authNameLabel').hidden=authMode!=='signup';
+  document.getElementById('authName').required=authMode==='signup';
+  const password=document.getElementById('authPassword');
+  password.value=''; password.required=authMode!=='reset'; password.disabled=authMode==='reset';
+  password.autocomplete=authMode==='signup'?'new-password':'current-password';
+  document.getElementById('authPasswordLabel').hidden=authMode==='reset';
+  document.getElementById('authSubmit').textContent=authMode==='reset'?'Tiklash havolasini yuborish':document.getElementById('authTitle').textContent;
+  renderAccountHistory();
+  modal.querySelector('.account-dialog').focus();
+}
+function closeAuth(){
+  if(authBusy) return;
+  document.getElementById('authModal').hidden=true;
+  document.getElementById('authPassword').value='';
+  authReturnFocus?.focus();
+}
+function authError(e){
+  return ({'auth/invalid-email':'Email manzili noto‘g‘ri.', 'auth/invalid-credential':'Email yoki parol noto‘g‘ri.', 'auth/email-already-in-use':'Bu email bilan akkaunt mavjud.', 'auth/weak-password':'Parol kamida 6 belgidan iborat bo‘lsin.', 'auth/too-many-requests':'Urinishlar ko‘p. Birozdan so‘ng qayta urinib ko‘ring.', 'auth/network-request-failed':'Internet aloqasini tekshiring.'})[e.code] || 'Amal bajarilmadi. Firebase sozlamalarini tekshiring yoki qayta urinib ko‘ring.';
+}
+async function submitAuth(event){
+  event.preventDefault();
+  if(authBusy) return;
+  if(!accountAuth){accountStatus('Firebase hali tayyor emas. Sozlamalar va ulanishni tekshiring.');return;}
+  const mode=authMode, email=document.getElementById('authEmail').value.trim(), password=document.getElementById('authPassword').value;
+  authBusy=true; document.getElementById('authSubmit').disabled=true;
+  let success=false;
+  try{
+    if(mode==='reset'){
+      try{await firebaseAPI.sendPasswordResetEmail(accountAuth,email);}catch(e){if(e.code!=='auth/user-not-found') throw e;}
+      accountStatus('Agar bu email uchun akkaunt mavjud bo‘lsa, tiklash havolasi yuborildi. Spam papkasini ham tekshiring.');
+    }else if(mode==='signup'){
+      const credential=await firebaseAPI.createUserWithEmailAndPassword(accountAuth,email,password);
+      await firebaseAPI.updateProfile(credential.user,{displayName:document.getElementById('authName').value.trim()});
+      success=true;
+    }else{await firebaseAPI.signInWithEmailAndPassword(accountAuth,email,password);success=true;}
+  }catch(e){accountStatus(authError(e));}
+  finally{authBusy=false;document.getElementById('authSubmit').disabled=false;document.getElementById('authPassword').value='';}
+  if(success){updateAccountControls();closeAuth();}
+}
+async function logoutAccount(){
+  if(!accountAuth) return;
+  if(pendingWrites){openAuth('account');accountStatus('Saqlash tugashini kuting. Internet aloqasini tekshiring.');return;}
+  try{await firebaseAPI.signOut(accountAuth);}catch(e){openAuth('account');accountStatus(authError(e));}
+}
+async function importLegacyProgress(){
+  if(!requireAccount()) return;
+  if(!confirm('Bu qurilmadagi eski natijalar siznikimi? Faqat bulutda mavjud bo‘lmagan bo‘limlar ko‘chiriladi.')) return;
+  const uid=accountUser.uid, epoch=accountEpoch;
+  let entries=[];
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(isProgressKey(k)) entries.push([k,localStorage.getItem(k)]);}}catch(e){accountStatus('Brauzer xotirasini o‘qib bo‘lmadi.');return;}
+  pendingWrites++;
+  try{
+    for(const [key,value] of entries){
+      if(epoch!==accountEpoch) return;
+      const ref=firebaseAPI.doc(accountDB,'users',uid,'progress',key);
+      await firebaseAPI.runTransaction(accountDB,async tx=>{const old=await tx.get(ref);if(!old.exists()) tx.set(ref,{value});});
+    }
+    if(epoch===accountEpoch) accountStatus(entries.length?'Eski natijalar ko‘chirildi. Mavjud bulut natijalari almashtirilmadi.':'Bu qurilmada eski natijalar topilmadi.');
+  }catch(e){accountStatus('Ko‘chirish tugamadi. Qayta urinib ko‘ring.');}
+  finally{pendingWrites--;}
+}
+function renderAccountHistory(){
+  const target=document.getElementById('accountHistory'); if(!target) return;
+  const recordings=Object.keys(progress).filter(k=>k.startsWith('recs_')).flatMap(k=>safeJSON(k,[]).map(r=>({...r,topic:k.slice(5)})));
+  const mocks=safeJSON('mockSavesMeta',[]);
+  target.innerHTML=`<p>Tugallangan mavzular: ${safeJSON('completedTopics',[]).length}</p><p>Audio yozuvlar tarixi: ${recordings.length+mocks.length}</p>`+
+    [...recordings,...mocks].slice(-100).reverse().map(r=>`<p>${escapeHTML(r.q || r.topic)} • ${escapeHTML(new Date(r.date).toLocaleString())}${r.duration?' • '+escapeHTML(r.duration)+' s':''}</p>`).join('')+
+    '<p>Audio tarixi faqat metama’lumotlarni saqlaydi. Audio fayllar joriy mashq davomida tinglanadi.</p>';
 }
