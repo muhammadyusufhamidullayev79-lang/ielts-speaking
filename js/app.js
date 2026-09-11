@@ -102,6 +102,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
   window._lazyRest=_lazyRest;
 
   syncCounts();
+  // hero pleyer darhol haqiqiy umumiy vaqtni ko'rsatadi (statik 0:24 / 1:08 emas)
+  heroAudioResetUI(heroEstimatedDuration(heroAudioText()));
   renderDaily();
   renderMockHistory();
   updateMockStats();
@@ -891,49 +893,76 @@ function syncCounts(){
   ['', '2'].forEach(sfx=>{ set('p1HeaderCount'+sfx, p1); set('p2HeaderCount'+sfx, p2); set('p3HeaderCount'+sfx, p3); });
 }
 
-// HERO audio demo — vaqt va progress haqiqiy o'qilayotgan matnga qarab hisoblanadi
+// HERO audio demo — vaqt va progress haqiqiy holatga qarab (qotib qolgan "0:24 / 1:08" o'rniga)
 let heroAudioTimer=null;
-function playHeroAudio(){
-  const text="Describe a person who taught you something important. Who is this person, how do you know this person, what this person taught you, and explain why it was important.";
+let heroAudioPlaying=false;
+function heroAudioText(){
+  return "Describe a person who taught you something important. Who is this person, how do you know this person, what this person taught you, and explain why it was important.";
+}
+function heroEstimatedDuration(text){
+  // nutq tezligi ~2.6 so'z/sek (rate=1.0); sozlangan tezlikka moslashtiramiz
+  const words=text.trim().split(/\s+/).length;
+  const rate=Math.min(1.3, Math.max(0.7, parseFloat(speechRate)||1));
+  return Math.max(4, Math.round(words/(2.6*rate)));
+}
+function heroAudioResetUI(total){
   const bar=document.getElementById('heroProgress');
   const timeEl=document.getElementById('heroAudioTime');
-  if(heroAudioTimer){ clearInterval(heroAudioTimer); heroAudioTimer=null; }
-  // so'z tezligi ~2.6 so'z/sek => umumiy davomiylik taxmini
-  const words=text.trim().split(/\s+/).length;
-  const total=Math.max(4, Math.round(words/2.6));
+  const btn=document.getElementById('heroPlayBtn');
+  if(bar) bar.style.width='0%';
+  if(timeEl) timeEl.textContent=`0:00 / 0:${String(total).padStart(2,'0')}`;
+  if(btn) btn.innerHTML='<i data-lucide="play" class="w-4 h-4 fill-current"></i>';
+  refreshIcons();
+}
+function playHeroAudio(){
+  const bar=document.getElementById('heroProgress');
+  const timeEl=document.getElementById('heroAudioTime');
+  const btn=document.getElementById('heroPlayBtn');
+  // qayta bosilsa — to'xtatamiz
+  if(heroAudioPlaying){
+    stopSpeak();
+    if(heroAudioTimer){ clearInterval(heroAudioTimer); heroAudioTimer=null; }
+    heroAudioPlaying=false;
+    heroAudioResetUI(heroEstimatedDuration(heroAudioText()));
+    return;
+  }
+  const text=heroAudioText();
+  const total=heroEstimatedDuration(text);
   let elapsed=0;
-  if(bar){ bar.style.width='0%'; }
+  heroAudioPlaying=true;
+  if(bar) bar.style.width='0%';
+  if(btn) btn.innerHTML='<i data-lucide="square" class="w-4 h-4 fill-current"></i>';
+  refreshIcons();
   const render=()=>{
-    const m=String(Math.floor(elapsed/60)).padStart(1,'0'), sec=String(elapsed%60).padStart(2,'0');
-    const tm=String(Math.floor(total/60)).padStart(1,'0'), ts=String(total%60).padStart(2,'0');
-    if(timeEl) timeEl.textContent=`${m}:${sec} / ${tm}:${ts}`;
+    const sec=String(elapsed%60).padStart(2,'0');
+    const tsec=String(total%60).padStart(2,'0');
+    if(timeEl) timeEl.textContent=`0:${sec} / 0:${tsec}`;
     if(bar) bar.style.width=Math.min(100, elapsed/total*100).toFixed(0)+'%';
   };
   render();
-  const btn=document.getElementById('heroPlayBtn');
-  if(btn) btn.innerHTML='<i data-lucide="pause" class="w-4 h-4"></i>';
-  refreshIcons();
+  if(heroAudioTimer) clearInterval(heroAudioTimer);
   heroAudioTimer=setInterval(()=>{
     elapsed++;
-    if(elapsed>=total){ clearInterval(heroAudioTimer); heroAudioTimer=null; }
+    if(elapsed>total) elapsed=total;
     render();
+    if(elapsed>=total){ clearInterval(heroAudioTimer); heroAudioTimer=null; }
   },1000);
-  const reset=()=>{
+  const finish=()=>{
     if(heroAudioTimer){ clearInterval(heroAudioTimer); heroAudioTimer=null; }
-    if(bar) bar.style.width='0%';
-    if(timeEl) timeEl.textContent=`0:00 / 0:${String(total).padStart(2,'0')}`;
-    if(btn) btn.innerHTML='<i data-lucide="play" class="w-4 h-4 fill-current"></i>';
-    refreshIcons();
+    heroAudioPlaying=false;
+    heroAudioResetUI(total);
   };
-  speak(text, voicePref, reset);
-  // xavfsizlik: nutq tugamasa ham 2x vaqtdan keyin reset
-  setTimeout(()=>{ if(heroAudioTimer && elapsed>=total*2) reset(); }, (total*2+2)*1000);
+  // brauzerda ovoz mavjud bo'lmasa ham tugma holati to'g'ri qoladi
+  try{
+    const u=speak(text, voicePref, finish);
+    if(!u) finish();
+  }catch(e){ finish(); }
 }
-
 // DAILY
 // DAILY
 function renderDaily(){
   document.getElementById('dailyNum').textContent=String(dailyNum).padStart(2,'0');
+  const ri=document.getElementById('dailyRestartInfo'); if(ri) ri.textContent=String(dailyNum).padStart(2,'0');
   document.getElementById('streakVal').textContent=streak+' kun';
   // week plan
   const weekEl=document.getElementById('weekPlan');
