@@ -113,6 +113,7 @@ let mockSessionSaves = [];        // [{qIdx, duration, date, url, blob}]
 let mockAnsweredMap = {};         // qIdx -> true (user pressed "Saqlash")
 let mockAnswersMeta = [];         // [{qIdx, part, q, duration, date}]
 let mockRevealAnswer = false;     // Best Answer ko'rsatish (mock davomida yopiq)
+let lastAIReview = null;          // oxirgi mock uchun real AI tahlili (agar API ulangan bo'lsa)
 
 // Speech-to-text (Web Speech API) — mock yozuvi davomida jonli transkripsiya
 let recognition = null;
@@ -650,6 +651,7 @@ function startMock(){
   mockRevealAnswer=false;
   mockTranscripts={};
   mockConfidences={};
+  lastAIReview=null;
   stopLiveTranscription();
   const runner=document.getElementById('mockRunner');
   runner.classList.remove('hidden');
@@ -1446,6 +1448,106 @@ function grammarFromTranscript(t){
   return Math.max(0.1, 0.3 + 0.4 * conn + 0.3 * len - fillPen);
 }
 
+/* ============ REAL AI TAHLILI (Vercel /api/analyze) ============ */
+function sanitizeAIResult(data){
+  // AI qaytargan ballarni xavfsiz ko'rinishga keltiramiz
+  const clean = (v) => {
+    const n = parseFloat(v);
+    if(!isFinite(n)) return null;
+    return Math.min(9, Math.max(0, Math.round(n * 2) / 2));
+  };
+  if(!data) return null;
+  const out = { overallBand: clean(data.overallBand), summary: '', questions: [], criteria: null };
+  if(data.criteria && typeof data.criteria === 'object'){
+    const c = {};
+    c.fluency = clean(data.criteria.fluency);
+    c.lexical = clean(data.criteria.lexical);
+    c.grammar = clean(data.criteria.grammar);
+    c.pronunciation = clean(data.criteria.pronunciation);
+    if(c.fluency != null || c.lexical != null || c.grammar != null || c.pronunciation != null) out.criteria = c;
+  }
+  out.summary = sanitizeText(data.summary, 1000);
+  if(Array.isArray(data.questions)){
+    out.questions = data.questions.slice(0, 11).map(q => ({
+      index: parseInt(q && q.index, 10),
+      part: sanitizeText(q && q.part, 20),
+      question: sanitizeText(q && q.question, 200),
+      corrections: Array.isArray(q && q.corrections) ? q.corrections.slice(0, 6).map(x => sanitizeText(x, 300)).filter(Boolean) : [],
+      betterExample: sanitizeText(q && q.betterExample, 500)
+    })).filter(q => !isNaN(q.index));
+  }
+  return out;
+}
+
+async function requestAIReview(){
+  const items = [];
+  mockSessionSaves.forEach(r => {
+    if(!mockAnsweredMap[r.qIdx]) return;
+    const it = mockQueue[r.qIdx];
+    const transcript = mockTranscripts[r.qIdx];
+    if(!transcript || !it) return;
+    items.push({
+      index: r.qIdx,
+      part: it.part,
+      question: it.q,
+      transcript: transcript,
+      bestAnswer: (it.a || '').slice(0, 1500)
+    });
+  });
+  if(!items.length) return null;
+  try{
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 25000);
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ questions: items }),
+      signal: ctrl.signal
+    });
+    clearTimeout(to);
+    if(!res.ok) return null;
+    const data = await res.json();
+    if(!data || data.ok !== true || !data.result) return null;
+    return sanitizeAIResult(data.result);
+  }catch(e){ return null; }
+}
+
+function renderAIReview(ai){
+  const panel = document.getElementById('aiReviewPanel');
+  if(!panel) return;
+  if(!ai){
+    panel.classList.add('hidden');
+    return;
+  }
+  const badge = document.getElementById('resHeaderBadge');
+  if(badge) badge.textContent = '\u2713 AI TAHLILI (REAL)';
+
+  const summary = document.getElementById('aiSummary');
+  if(summary) summary.textContent = ai.summary || 'AI tahlili tayyor.';
+
+  const list = document.getElementById('aiCorrections');
+  if(list){
+    const qs = ai.questions && ai.questions.length
+      ? ai.questions.map(q => {
+          const partLabel = q.part ? '<span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ' + (mockPartStyle(q.part).badge) + '">' + escapeHTML(q.part) + '</span>' : '';
+          const corr = (q.corrections || []).map(c => '<li class="text-[12px] leading-5">' + escapeHTML(c) + '</li>').join('');
+          const better = q.betterExample
+            ? '<div class="mt-1.5 text-[12px] leading-5 text-violet-700 dark:text-violet-300"><b>Yaxshiroq namuna:</b> ' + escapeHTML(q.betterExample) + '</div>'
+            : '';
+          return '<div class="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-3">' +
+            '<div class="flex items-center gap-2 mb-1.5">' +
+              '<span class="text-[11px] font-extrabold text-slate-500">Savol ' + (q.index + 1) + '</span>' + partLabel +
+            '</div>' +
+            (corr ? '<ul class="space-y-1 list-disc list-inside text-slate-600 dark:text-slate-300">' + corr + '</ul>' : '<div class="text-[12px] text-slate-500">Xato topilmadi.</div>') +
+            better +
+          '</div>';
+        }).join('')
+      : '';
+    list.innerHTML = qs || '<div class="text-[12px] text-slate-500">Savol bo\u2018yicha tuzatishlar yo\u2018q.</div>';
+  }
+  panel.classList.remove('hidden');
+}
+
 // Ballar endi faqat o'lchangan signallardan kelib chiqadi (random/bonus yo'q).
 function computeBands(analyses, answered, total){
   const n = analyses.length;
@@ -1525,7 +1627,13 @@ async function showMockResults(){
   if(!el) return;
 
   let analyses = [];
-  if(answered > 0) analyses = await analyzeMockSession();
+  let aiReview = null;
+  if(answered > 0){
+    analyses = await analyzeMockSession();
+    // Real AI tahlili (Vercel /api/analyze). Kalit yo'q / xato bo'lsa -> null, heuristik qoladi.
+    aiReview = await requestAIReview();
+    lastAIReview = aiReview;
+  }
 
   let flu, lex, gram, pron, overall, feedback;
   if(answered === 0){
@@ -1537,8 +1645,20 @@ async function showMockResults(){
   } else {
     const b = computeBands(analyses, answered, total);
     flu = b.flu; lex = b.lex; gram = b.gram; pron = b.pron;
-    overall = Math.round(((flu + lex + gram + pron) / 4) * 2) / 2;
+    // AI ballari mavjud bo'lsa — ular ustunlik qiladi
+    if(aiReview && aiReview.criteria){
+      const c = aiReview.criteria;
+      if(c.fluency != null) flu = c.fluency;
+      if(c.lexical != null) lex = c.lexical;
+      if(c.grammar != null) gram = c.grammar;
+      if(c.pronunciation != null) pron = c.pronunciation;
+    }
+    overall = aiReview && aiReview.overallBand != null
+      ? aiReview.overallBand
+      : Math.round(((flu + lex + gram + pron) / 4) * 2) / 2;
     feedback = buildMockFeedback(b, analyses, answered, total);
+    if(aiReview) feedback.push('Real AI tahlili ulandi \u2014 ballar va tuzatishlar quyida.');
+    else feedback.push('AI (OpenAI/Gemini) ulanmagan \u2014 audio + matn o\u2018lchovlari asosidagi baho ishlatildi.');
   }
 
   el.classList.remove('hidden');
@@ -1554,6 +1674,9 @@ async function showMockResults(){
   if(recEl) recEl.textContent = recorded + ' audio yozuv';
 
   document.getElementById('resFeedback').innerHTML = feedback.map(f => '<div class="text-[13px] leading-5">' + f + '</div>').join('');
+
+  // Real AI tahlili paneli
+  renderAIReview(aiReview);
 
   // === HAR BIR BO'LIM UCHUN ALOHIDA RO'YXAT: savol + sizning audio javobingiz + Best Answer ===
   renderMockResultsByPart();
@@ -1637,11 +1760,22 @@ function downloadMockReport(){
       const s=mockRec(i);
       lines.push(`Q${i+1}. ${it.q}`);
       lines.push(`Sizning javobingiz: ${s? `${fmtDur(s.duration)} audio yozuv (${mockAnsweredMap[i]?'saqlangan':'yozilgan'})` : 'yozuv yo\'q'}`);
+      if(mockTranscripts[i]) lines.push(`Transkript: ${mockTranscripts[i]}`);
+      const aiq = lastAIReview && lastAIReview.questions && lastAIReview.questions.find(q => q.index === i);
+      if(aiq){
+        if(aiq.corrections && aiq.corrections.length) aiq.corrections.forEach(c => lines.push(`  AI tuzatish: ${c}`));
+        if(aiq.betterExample) lines.push(`  AI yaxshiroq namuna: ${aiq.betterExample}`);
+      }
       lines.push(`Best Answer: ${it.a||''}`);
       if(it.hint) lines.push(`Tip: ${it.hint}`);
       lines.push('');
     });
   });
+  if(lastAIReview && lastAIReview.summary){
+    lines.push('========== AI TAHLILI ==========','');
+    lines.push(lastAIReview.summary);
+    lines.push('');
+  }
   const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');

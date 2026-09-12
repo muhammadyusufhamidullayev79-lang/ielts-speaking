@@ -462,7 +462,7 @@ html.dark { color-scheme: dark; }
         <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
         <div class="relative flex items-start justify-between gap-4">
           <div>
-            <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide">✓ TEKSHIRILDI • AUDIO + MATN TAHLILI</div>
+            <div id="resHeaderBadge" class="inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide">✓ TEKSHIRILDI • AUDIO + MATN TAHLILI</div>
             <h3 class="mt-3 font-extrabold text-[22px] leading-none">Mock Natijasi</h3>
             <p class="text-[13px] opacity-90 mt-1">Nutqingiz matnga aylantirilib (speech-to-text) va audio yozuvingiz (gapirish vaqti, pauzalar, ovoz) tahlil qilindi — quyida har bir mezon bo'yicha baho va tavsiyalar</p>
           </div>
@@ -512,6 +512,16 @@ html.dark { color-scheme: dark; }
             <button onclick="startMock()" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-5 py-2 text-[13px] font-bold">Qayta topshirish →</button>
           </div>
         </div>
+      </div>
+
+      <!-- REAL AI TAHLILI (OpenAI/Gemini ulangan bo'lsa) -->
+      <div id="aiReviewPanel" class="hidden border-t border-slate-200 dark:border-white/10 px-6 py-6">
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] font-extrabold tracking-widest text-slate-500">AI TAHLILI</span>
+          <span class="text-[10px] font-bold bg-violet-50 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30 px-2 py-0.5 rounded-full">REAL AI</span>
+        </div>
+        <p id="aiSummary" class="mt-2 text-[13px] leading-6 bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 rounded-2xl p-4"></p>
+        <div id="aiCorrections" class="mt-3 space-y-2"></div>
       </div>
 
       <!-- HAR BIR BO'LIM UCHUN ALOHIDA RO'YXAT: savol + sizning audio javobingiz + Best Answer -->
