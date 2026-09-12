@@ -27,6 +27,7 @@ document.addEventListener('visibilitychange', ()=>{
 const PROGRESS_KEYS = new Set(['mockHistory','mockSavesMeta','mockDone','lastMockIds','dailyNum','streak','dailyHistory','completedTopics']);
 const isProgressKey = k => PROGRESS_KEYS.has(k) || /^recs_[a-zA-Z0-9_-]+$/.test(k);
 let accountUser = null, accountReady = false, progress = Object.create(null);
+let accountProfile = { name: '', avatar: '' };  // foydalanuvchi profili (nickname + avatar)
 let firebaseAPI, accountAuth, accountDB, unsubscribeProgress, accountEpoch = 0;
 let pendingWrites = 0, authMode = 'login', authBusy = false, authReturnFocus;
 function safeGet(k, d=null){
@@ -113,6 +114,11 @@ let mockSessionSaves = [];        // [{qIdx, duration, date, url, blob}]
 let mockAnsweredMap = {};         // qIdx -> true (user pressed "Saqlash")
 let mockAnswersMeta = [];         // [{qIdx, part, q, duration, date}]
 let mockRevealAnswer = false;     // Best Answer ko'rsatish (mock davomida yopiq)
+
+// Speech-to-text (Web Speech API) — mock yozuvi davomida jonli transkripsiya
+let recognition = null;
+let mockTranscripts = {};        // qIdx -> yakuniy matn
+let mockConfidences = {};        // qIdx -> { sum, count } (ASR ishonch darajasi)
 
 // daily
 let dailyInterval = null;
@@ -237,7 +243,7 @@ function router(view){
   const allowed=['home','part1','part2','part3','mock','daily'];
   if(!allowed.includes(view)) view='home';
   // cleanup media/recording when leaving mock
-  if(view!=='mock'){ try{ stopSpeak(); }catch(e){} try{ if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop(); }catch(e){} try{ if(window._modalRecIntv) clearInterval(window._modalRecIntv); }catch(e){} }
+  if(view!=='mock'){ try{ stopSpeak(); }catch(e){} try{ stopLiveTranscription(); }catch(e){} try{ if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop(); }catch(e){} try{ if(window._modalRecIntv) clearInterval(window._modalRecIntv); }catch(e){} }
   // pause daily timer if leaving daily (keep state but stop tick)
   // (daily timer continues only if user explicitly started, but we reduce CPU by not ticking when hidden)
   document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));
@@ -617,16 +623,16 @@ function buildMockQueue(){
   // filter out lastIds if possible
   let p1Filtered = p1Pool.filter(t=>!lastIds.includes(t.id));
   if(p1Filtered.length < 6) p1Filtered = p1Pool;
-  const p1 = p1Filtered.slice(0,6).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 1', badge:'PART 1', q:q.q, a:q.a, hint:q.tip, id:t.id})));
+  const p1 = p1Filtered.slice(0,6).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 1', badge:'PART 1', q:q.q, a:q.a, hint:q.tip, id:t.id, vocab:q.vocab})));
   // Part2: pick cue card not in lastIds
   let p2Pool = shuffleArray(DATA.part2);
   let p2Filtered = p2Pool.filter(t=>!lastIds.includes(t.id));
   const p2topic = (p2Filtered[0] || p2Pool[0]);
-  const p2 = [{part:'Part 2', badge:'PART 2 • CUE CARD', q: `${p2topic.title}. ${p2topic.prompts.join('. ')}.`, a:p2topic.answer, hint:p2topic.tip, id:p2topic.id, isCue:true, prompts:p2topic.prompts, title:p2topic.title}];
+  const p2 = [{part:'Part 2', badge:'PART 2 • CUE CARD', q: `${p2topic.title}. ${p2topic.prompts.join('. ')}.`, a:p2topic.answer, hint:p2topic.tip, id:p2topic.id, isCue:true, prompts:p2topic.prompts, title:p2topic.title, vocab:p2topic.vocab}];
   let p3Pool = shuffleArray(DATA.part3);
   let p3Filtered = p3Pool.filter(t=>!lastIds.includes(t.id));
   if(p3Filtered.length < 4) p3Filtered = p3Pool;
-  const p3 = p3Filtered.slice(0,4).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 3', badge:'PART 3', q:q.q, a:q.a, hint:q.tip, id:t.id})));
+  const p3 = p3Filtered.slice(0,4).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 3', badge:'PART 3', q:q.q, a:q.a, hint:q.tip, id:t.id, vocab:q.vocab})));
   const queue = [...p1, ...p2, ...p3];
   // save ids for next time
   const ids = [...p1Filtered.slice(0,6).map(t=>t.id), p2topic.id, ...p3Filtered.slice(0,4).map(t=>t.id)];
@@ -643,6 +649,9 @@ function startMock(){
   mockAnsweredMap={};
   mockAnswersMeta=[];
   mockRevealAnswer=false;
+  mockTranscripts={};
+  mockConfidences={};
+  stopLiveTranscription();
   const runner=document.getElementById('mockRunner');
   runner.classList.remove('hidden');
   hideMockResults();
@@ -787,6 +796,7 @@ function finishMock(){
 function stopMock(){
   clearInterval(mockTimerInterval); mockTimerInterval=null;
   stopSpeak();
+  stopLiveTranscription();
   if(mediaRecorder && mediaRecorder.state==='recording') try{ mediaRecorder.stop(); }catch(e){}
   try{ if(mediaRecorder && mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(tr=>tr.stop()); }catch(e){}
   const runner=document.getElementById('mockRunner');
@@ -797,6 +807,76 @@ function stopMock(){
 function getMockSavedForCurrent(){
   return mockSessionSaves.filter(s=> s.qIdx===mockIndex);
 }
+
+/* ============ SPEECH-TO-TEXT (Web Speech API) ============ */
+function speechRecAvailable(){
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+function stopLiveTranscription(){
+  if(recognition){
+    try{ recognition.onresult = null; recognition.onerror = null; recognition.onend = null; recognition.abort(); }catch(e){}
+    recognition = null;
+  }
+}
+function startLiveTranscription(){
+  if(!speechRecAvailable()){ updateSttStatus('off'); return false; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  try{
+    stopLiveTranscription();
+    recognition = new SR();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    const qIdx = mockIndex;
+    let finalText = '';
+    if(!mockTranscripts[qIdx]) mockTranscripts[qIdx] = '';
+    if(!mockConfidences[qIdx]) mockConfidences[qIdx] = { sum: 0, count: 0 };
+    recognition.onresult = (event) => {
+      let interim = '';
+      for(let i = event.resultIndex; i < event.results.length; i++){
+        const res = event.results[i];
+        if(res.isFinal){
+          finalText += res[0].transcript + ' ';
+          if(typeof res[0].confidence === 'number'){
+            mockConfidences[qIdx].sum += res[0].confidence;
+            mockConfidences[qIdx].count++;
+          }
+        } else {
+          interim += res[0].transcript;
+        }
+      }
+      mockTranscripts[qIdx] = (finalText + ' ' + interim).replace(/\s+/g, ' ').trim();
+      updateSttStatus('live');
+      updateLiveTranscriptUI();
+    };
+    recognition.onerror = (e) => {
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed') updateSttStatus('off');
+      else if(e.error === 'no-speech'){ /* kutishda davom etadi */ }
+    };
+    recognition.onend = () => { updateSttStatus(mockTranscripts[mockIndex] ? 'done' : 'idle'); };
+    recognition.start();
+    updateSttStatus('live');
+    return true;
+  }catch(e){ updateSttStatus('off'); return false; }
+}
+function updateSttStatus(state){
+  const el = document.getElementById('sttStatus');
+  if(!el) return;
+  const map = {
+    live:  { t: '● Tinglanmoqda', c: 'text-emerald-600 dark:text-emerald-400' },
+    done:  { t: '✓ Matn olindi',  c: 'text-emerald-600 dark:text-emerald-400' },
+    idle:  { t: '',               c: '' },
+    off:   { t: 'Chrome/Edge da ishlaydi', c: 'text-slate-400' }
+  };
+  const s = map[state] || map.idle;
+  el.textContent = s.t; el.className = 'text-[10px] font-bold ' + s.c;
+}
+function updateLiveTranscriptUI(){
+  const el = document.getElementById('liveTranscript');
+  if(!el) return;
+  const text = mockTranscripts[mockIndex] || '';
+  el.textContent = text || 'Gapirganingizda shu yerda matn ko\u2018rinadi (Chrome/Edge).';
+}
 async function toggleRecording(){
   const btn=document.getElementById('recBtn');
   const status=document.getElementById('recStatus');
@@ -804,6 +884,7 @@ async function toggleRecording(){
   const time=document.getElementById('recTime');
   const playback=document.getElementById('playback');
   if(mediaRecorder && mediaRecorder.state==='recording'){
+    stopLiveTranscription();
     mediaRecorder.stop();
     status.textContent='Saqlanmoqda...';
     btn.classList.remove('animate-pulse');
@@ -837,6 +918,7 @@ async function toggleRecording(){
     };
     mediaRecorder.start();
     recStart=Date.now();
+    startLiveTranscription();
     status.textContent='Yozilmoqda...';
     status.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-500 text-white animate-pulse';
     btn.classList.add('animate-pulse');
@@ -1214,65 +1296,267 @@ window.closeMockResults=closeMockResults; window.revealMockAnswer=revealMockAnsw
 window.downloadMockReport=downloadMockReport; window.hideMockResults=hideMockResults;
 window.completeDaily=completeDaily; window.skipDaily=skipDaily; window.renderMockHistory=renderMockHistory;
 window.restartDaily=restartDaily; window.resetDailyProgress=resetDailyProgress; window.resetDailyLesson=resetDailyLesson;
+window.handleAvatarChange=handleAvatarChange; window.saveNickname=saveNickname;
 
 function closeMockResults(){ hideMockResults(); }
 function hideMockResults(){
   const el=document.getElementById('mockResults');
   if(el) el.classList.add('hidden');
 }
-function roundHalf(n){ return (Math.round(n*2)/2).toFixed(1); }
-function showMockResults(){
-  const meta = safeJSON('mockSavesMeta',[]);
+/* ================= MOCK AUDIO TAHLILI & BAHOLASH ================= */
+const PART_TARGETS = {
+  'Part 1': { min: 6, good: 12, great: 18, label: '12\u201330 soniya' },
+  'Part 2': { min: 35, good: 60, great: 90, label: '1:30\u20132:00 daqiqa' },
+  'Part 3': { min: 7, good: 15, great: 25, label: '15\u201340 soniya' }
+};
+
+// Yozuvni VAD (voice activity detection) bilan tahlil qiladi:
+// haqiqiy gapirish vaqti, pauzalar, ovoz darajasi.
+async function analyzeRecording(blob){
+  const info = { ok:false, totalSec:0, voicedSec:0, speechRatio:0, pauses:0, longPauses:0, maxPause:0, rms:0 };
+  if(!blob) return info;
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return info;
+    const ctx = new AC();
+    try{
+      const buf = await blob.arrayBuffer();
+      const audio = await ctx.decodeAudioData(buf);
+      const ch = audio.getChannelData(0);
+      const sr = audio.sampleRate;
+      const frame = Math.max(64, Math.floor(sr * 0.03));
+      const rmsArr = [];
+      let maxRms = 0, sumRms = 0;
+      for(let i = 0; i < ch.length; i += frame){
+        let s = 0; const end = Math.min(i + frame, ch.length); const n = end - i;
+        for(let j = i; j < end; j++){ const v = ch[j]; s += v * v; }
+        const rms = Math.sqrt(s / n);
+        rmsArr.push(rms); sumRms += rms; if(rms > maxRms) maxRms = rms;
+      }
+      if(!rmsArr.length) return info;
+      const frameSec = frame / sr;
+      const thresh = Math.max(0.006, maxRms * 0.05);
+      let voiced = 0, total = 0, curSilence = 0, pauses = 0, longPauses = 0, maxPause = 0;
+      for(const r of rmsArr){
+        total += frameSec;
+        if(r >= thresh){
+          voiced += frameSec;
+          if(curSilence > 0.5){ pauses++; if(curSilence > maxPause) maxPause = curSilence; if(curSilence >= 1.2) longPauses++; }
+          curSilence = 0;
+        } else {
+          curSilence += frameSec;
+        }
+      }
+      if(curSilence > 0.5){ pauses++; if(curSilence > maxPause) maxPause = curSilence; if(curSilence >= 1.2) longPauses++; }
+      info.ok = true;
+      info.totalSec = total;
+      info.voicedSec = voiced;
+      info.speechRatio = total ? (voiced / total) : 0;
+      info.pauses = pauses;
+      info.longPauses = longPauses;
+      info.maxPause = Math.round(maxPause * 10) / 10;
+      info.rms = rmsArr.length ? (sumRms / rmsArr.length) : 0;
+    } finally { try{ ctx.close(); }catch(e){} }
+  }catch(e){ /* decode qo'llab-quvvatlanmasa, pastda konservativ fallback */ }
+  return info;
+}
+
+async function analyzeMockSession(){
+  const recs = (mockSessionSaves || []).filter(r => mockAnsweredMap[r.qIdx]);
+  const out = [];
+  await Promise.all(recs.map(async r => {
+    const item = mockQueue[r.qIdx];
+    const a = await analyzeRecording(r.blob);
+    a.qIdx = r.qIdx;
+    a.part = item ? item.part : 'Part 1';
+    a.wallSec = r.duration || 0;
+    a.transcript = mockTranscripts[r.qIdx] || '';
+    const c = mockConfidences[r.qIdx];
+    a.asrConfidence = (c && c.count) ? (c.sum / c.count) : null;
+    a.tr = analyzeTranscript(a.transcript, item ? item.vocab : null);
+    if(!a.ok){
+      // audio decode ishlamasa — yozuv davomiyligiga qarab konservativ baho
+      a.estimated = true;
+      a.totalSec = a.wallSec || 0;
+      a.voicedSec = Math.max(0, (a.wallSec || 0) * 0.6);
+      a.speechRatio = 0.6;
+    }
+    out.push(a);
+  }));
+  return out;
+}
+
+function lengthScore(voicedSec, part){
+  const t = PART_TARGETS[part] || PART_TARGETS['Part 1'];
+  if(voicedSec >= t.great) return 1;
+  if(voicedSec >= t.good) return 0.8 + 0.2 * ((voicedSec - t.good) / (t.great - t.good));
+  if(voicedSec >= t.min) return 0.55 + 0.25 * ((voicedSec - t.min) / (t.good - t.min));
+  if(voicedSec > 0) return 0.2 + 0.35 * (voicedSec / t.min);
+  return 0;
+}
+function continuityScore(speechRatio){
+  if(speechRatio >= 0.85) return 0.95;
+  if(speechRatio >= 0.75) return 0.8 + 0.15 * ((speechRatio - 0.75) / 0.1);
+  if(speechRatio >= 0.6) return 0.65 + 0.15 * ((speechRatio - 0.6) / 0.15);
+  if(speechRatio >= 0.45) return 0.5 + 0.15 * ((speechRatio - 0.45) / 0.15);
+  return Math.max(0.05, 0.45 * (speechRatio / 0.45));
+}
+function clampBand(raw, comp){
+  let b = Math.round((raw * comp) * 2) / 2; // 0.5 qadam
+  b = Math.min(9, Math.max(3, b));
+  return b;
+}
+
+/* ============ MATN TAHLILI (speech-to-text natijasidan) ============ */
+const FILLERS = ['um','uh','erm','hmm','you know','i mean','like','basically','actually','so yeah','well'];
+const CONNECTORS = ['however','moreover','furthermore','although','because','therefore','in addition','for example','for instance','while','whereas','on the other hand','as a result','consequently','besides','despite'];
+
+function analyzeTranscript(text, bestVocab){
+  const t = { wordCount:0, uniqueRatio:0, longWordRatio:0, fillers:0, connectorCount:0, vocabMatch:0 };
+  if(!text) return t;
+  const clean = String(text).toLowerCase().replace(/[^a-z0-9'\s-]/g, ' ');
+  const tokens = clean.split(/\s+/).filter(Boolean);
+  const words = tokens.filter(w => /[a-z]/.test(w));
+  t.wordCount = words.length;
+  if(t.wordCount){
+    const unique = new Set(words);
+    t.uniqueRatio = unique.size / t.wordCount;
+    t.longWordRatio = words.filter(w => w.length >= 7).length / t.wordCount;
+    t.fillers = FILLERS.filter(f => {
+      const pat = f.indexOf(' ') > -1 ? f.replace(/ /g, '\\s+') : '\\b' + f + '\\b';
+      return new RegExp(pat, 'g').test(clean);
+    }).length;
+    t.connectorCount = CONNECTORS.filter(c => new RegExp('\\b' + c + '\\b', 'g').test(clean)).length;
+    if(Array.isArray(bestVocab) && bestVocab.length){
+      t.vocabMatch = bestVocab.filter(v => clean.indexOf(String(v).toLowerCase()) > -1).length;
+    }
+  }
+  return t;
+}
+function lexicalFromTranscript(t){
+  if(!t || !t.wordCount) return 0;
+  const div = Math.min(1, t.uniqueRatio / 0.55);   // 0.55 unikallik ~ to'liq
+  const adv = Math.min(1, t.longWordRatio / 0.15); // uzun/akademik so'zlar
+  const conn = Math.min(1, t.connectorCount / 2);
+  return 0.25 + 0.4 * div + 0.2 * adv + 0.15 * conn;
+}
+function grammarFromTranscript(t){
+  if(!t || !t.wordCount) return 0;
+  const conn = Math.min(1, t.connectorCount / 2);
+  const len = Math.min(1, t.wordCount / 60);
+  const fillPen = Math.min(0.3, t.fillers * 0.05);
+  return Math.max(0.1, 0.3 + 0.4 * conn + 0.3 * len - fillPen);
+}
+
+// Ballar endi faqat o'lchangan signallardan kelib chiqadi (random/bonus yo'q).
+function computeBands(analyses, answered, total){
+  const n = analyses.length;
+  const avg = f => n ? analyses.reduce((s, a) => s + f(a), 0) / n : 0;
+  const lenAvg = avg(a => lengthScore(a.voicedSec, a.part));
+  const contAvg = avg(a => continuityScore(a.speechRatio));
+  const levelAvg = avg(a => Math.min(1, a.rms * 6));
+  const lexT = avg(a => lexicalFromTranscript(a.tr));
+  const gramT = avg(a => grammarFromTranscript(a.tr));
+  const longPauses = analyses.reduce((s, a) => s + (a.longPauses || 0), 0);
+  const maxPause = analyses.reduce((s, a) => Math.max(s, a.maxPause || 0), 0);
+  const fillers = analyses.reduce((s, a) => s + ((a.tr && a.tr.fillers) || 0), 0);
+  const wordCount = analyses.reduce((s, a) => s + ((a.tr && a.tr.wordCount) || 0), 0);
+  const hasTranscript = analyses.some(a => a.tr && a.tr.wordCount);
+  const asrConf = avg(a => a.asrConfidence != null ? a.asrConfidence : 0);
+  const hasAsr = analyses.some(a => a.asrConfidence != null);
+  // ASR ishonchi odatda 0.6–0.95 oralig'ida — uni 0..1 "tiniqlik"ga keltiramiz
+  const asrClarity = Math.max(0, Math.min(1, (asrConf - 0.55) / 0.35));
+  const ratio = total ? (answered / total) : 0;
+  const comp = 0.35 + 0.65 * ratio;
+
+  const pausePen = Math.min(1.5, longPauses * 0.2 + (maxPause >= 5 ? 0.5 : 0) + Math.min(0.4, fillers * 0.05));
+  const flu  = clampBand(2.5 + (contAvg * 0.7 + lenAvg * 0.3) * 6.5 - pausePen, comp);
+  // Lexical: transkript bor bo'lsa — so'z boyligi; yo'q bo'lsa — davomiylik/qat'iylik
+  const lex  = clampBand(2.5 + (hasTranscript ? (lexT * 0.7 + lenAvg * 0.3) : (lenAvg * 0.8 + contAvg * 0.2)) * 6.5, comp);
+  // Grammar: transkript bor bo'lsa — bog'lovchilar + uzunlik; yo'q bo'lsa — umumiy o'lchov
+  const gram = clampBand(2.5 + (hasTranscript ? (gramT * 0.7 + contAvg * 0.3) : (lenAvg * 0.5 + contAvg * 0.5)) * 6.5, comp);
+  // Pronunciation: ASR ishonchi (tiniqlik) bor bo'lsa ishlatiladi, aks holda ovoz sifati
+  const pron = clampBand(2.5 + (hasAsr ? (asrClarity * 0.55 + contAvg * 0.45) : (levelAvg * 0.25 + contAvg * 0.5 + lenAvg * 0.25)) * 6.5, comp);
+
+  return { flu, lex, gram, pron, ratio, longPauses, maxPause, lenAvg, contAvg, hasTranscript, hasAsr, fillers, wordCount };
+}
+
+function buildMockFeedback(b, analyses, answered, total){
+  const f = [];
+  f.push(answered + ' / ' + total + ' savolga javob berdingiz.');
+  f.push('Nutq davomiyligi: yozuv vaqtining ~' + Math.round(b.contAvg * 100) + '% qismida haqiqatdan gapirgansiz (pauza emas).');
+  if(b.longPauses > 0) f.push(b.longPauses + ' ta uzun pauza aniqlandi \u2014 oqimni saqlash uchun pauzalarni qisqartiring.');
+  if(b.maxPause >= 3) f.push('Eng uzun pauza ' + b.maxPause.toFixed(1) + ' soniya.');
+
+  // Speech-to-text natijalari
+  if(b.hasTranscript){
+    f.push('Speech-to-text: jami ~' + b.wordCount + ' so\u2018z aytdingiz, shundan ' + b.fillers + ' ta to\u2018ldiruvchi so\u2018z (um, like, you know).');
+    const connectors = analyses.reduce((s, a) => s + ((a.tr && a.tr.connectorCount) || 0), 0);
+    if(connectors < 3) f.push('Bog\u2018lovchilar juda kam (' + connectors + ' ta) \u2014 however, because, for example kabi so\u2018zlarni qo\u2018shing.');
+    else f.push('Bog\u2018lovchilardan yaxshi foydalangansiz (' + connectors + ' ta).');
+  } else {
+    f.push('Eslatma: matn tahlili uchun Chrome/Edge brauzerida topshiring \u2014 hozir faqat audio o\u2018lchovlar ishlatildi.');
+  }
+
+  const weak = analyses.filter(a => a.voicedSec < (PART_TARGETS[a.part] || PART_TARGETS['Part 1']).min);
+  if(weak.length){
+    const byPart = {};
+    weak.forEach(a => { (byPart[a.part] = byPart[a.part] || []).push(a); });
+    Object.keys(byPart).forEach(p => {
+      f.push(p + ': ' + byPart[p].length + ' ta javob juda qisqa \u2014 har biri kamida ' + PART_TARGETS[p].label + ' bo\u2018lsin.');
+    });
+  }
+
+  if(b.flu < 6) f.push('Fluency: pauzalarni kamaytirib, bog\u2018lovchilar (however, moreover, actually) ishlating.');
+  else f.push('Fluency: yaxshi oqim \u2014 shu tempni saqlang!');
+  if(b.lex < 6) f.push('Lexical: javoblarni uzaytirib, mavzuga oid 2-3 akademik so\u2018z qo\u2018shing.');
+  else f.push('Lexical: so\u2018z boyligi yaxshi.');
+  if(b.gram < 6) f.push('Grammar: complex sentences (if, although, which, while) ko\u2018paytiring.');
+  else f.push('Grammar: tuzilma barqaror.');
+  if(b.pron < 6) f.push('Pronunciation: aniqroq va balandroq gapiring \u2014 AI ovozini tinglab, talaffuzni takrorlang.');
+  else f.push('Pronunciation: ovoz tiniq va barqaror.');
+  f.push('Eslatma: ballar yozuv + speech-to-text matnidan (gapirish vaqti, pauzalar, so\u2018z boyligi, bog\u2018lovchilar, talaffuz tiniqligi) hisoblanadi \u2014 tasodif yo\u2018q.');
+  return f;
+}
+
+async function showMockResults(){
   const total = mockQueue.length;
   const answered = mockSessionAnswered; // per-mock session, resets each mock
   const recorded = mockSessionSaves.length;
-  // IELTS scoring: 0.5 increments, 0 if no answers
-  let flu, lex, gram, pron, overall;
-  const ratio = total ? answered/total : 0;
-  if(answered === 0){
-    flu = lex = gram = pron = overall = "0.0";
-  } else {
-    // base 4.0-7.5 depending on ratio, plus time bonus if mockElapsed reasonable (8-14 min)
-    const timeBonus = (mockElapsed >= 480 && mockElapsed <= 840) ? 0.5 : 0;
-    const base = 4.0 + ratio*3.5 + timeBonus; // 4.0 to 8.0
-    flu = roundHalf(Math.min(9, Math.max(4.0, base + (Math.random()-0.5)*0.8)));
-    lex = roundHalf(Math.min(9, Math.max(4.0, base + 0.2 + (Math.random()-0.5)*0.7)));
-    gram = roundHalf(Math.min(9, Math.max(4.0, base + (Math.random()-0.5)*0.7)));
-    pron = roundHalf(Math.min(9, Math.max(4.0, base + 0.3 + (Math.random()-0.5)*0.6)));
-    // IELTS overall is average, rounded to nearest 0.5 (0.25 up to 0.5, 0.75 up to next)
-    const avg = (parseFloat(flu)+parseFloat(lex)+parseFloat(gram)+parseFloat(pron))/4;
-    overall = roundHalf(avg);
-  }
   const el = document.getElementById('mockResults');
   if(!el) return;
+
+  let analyses = [];
+  if(answered > 0) analyses = await analyzeMockSession();
+
+  let flu, lex, gram, pron, overall, feedback;
+  if(answered === 0){
+    flu = lex = gram = pron = overall = 0;
+    feedback = [
+      'Hech bir savolga javob bermadingiz \u2014 natija 0.0.',
+      'Har bir savolda \u201CRecord\u201D bosing, javob bering va \u201CSaqlash\u201D tugmasini bosing.'
+    ];
+  } else {
+    const b = computeBands(analyses, answered, total);
+    flu = b.flu; lex = b.lex; gram = b.gram; pron = b.pron;
+    overall = Math.round(((flu + lex + gram + pron) / 4) * 2) / 2;
+    feedback = buildMockFeedback(b, analyses, answered, total);
+  }
+
   el.classList.remove('hidden');
   if(el.scrollIntoView) try{el.scrollIntoView({behavior:'smooth'});}catch(e){}
-  document.getElementById('resOverall').textContent = overall;
-  document.getElementById('resFlu').textContent = flu;
-  document.getElementById('resLex').textContent = lex;
-  document.getElementById('resGram').textContent = gram;
-  document.getElementById('resPron').textContent = pron;
-  document.getElementById('resTotal').textContent = `${answered} / ${total} javob`;
-  document.getElementById('resTime').textContent = `${Math.floor(mockElapsed/60)}:${String(mockElapsed%60).padStart(2,'0')}`;
-  const recEl=document.getElementById('resAudioCount');
-  if(recEl) recEl.textContent = `${recorded} audio yozuv`;
-  // feedback - handle 0 and realistic
-  const feedback = [];
-  if(answered === 0){
-    feedback.push("• Hech bir savolga javob bermadingiz — Mock 0.0. Iltimos, har bir savolga kamida 20-30 soniya javob bering va Record bosing.");
-    feedback.push("• Maslahat: Part 1 da 1-2 gap, Part 2 da 1.5-2 daqiqa, Part 3 da 3-4 gap bilan to'liq javob bering.");
-  } else {
-    if(parseFloat(flu) < 6.0) feedback.push("• Fluency: ko'proq bog'lovchilar (however, moreover, actually) va pauzalarsiz gapiring. Har bir javobni 30-60 soniya cho'zing.");
-    else feedback.push("• Fluency: yaxshi oqim, shu tempni saqlang!");
-    if(parseFloat(lex) < 6.0) feedback.push("• Lexical: mavzuga oid 2-3 ta akademik so'z (e.g., infrastructure, sustainable, heritage) qo'shing.");
-    else feedback.push("• Lexical: boy so'z boyligi, ajoyib!");
-    if(parseFloat(gram) < 6.0) feedback.push("• Grammar: complex sentences (if, although, which, while) ko'paytiring.");
-    else feedback.push("• Grammar: tuzilma aniq, xatolar kam.");
-    if(parseFloat(pron) < 6.0) feedback.push("• Pronunciation: AI ovozini tinglab, intonatsiyani takrorlang, yozib o'zingizni tinglang.");
-    else feedback.push("• Pronunciation: talaffuz tiniq!");
-    if(ratio < 1) feedback.push(`• To'liqlik: ${answered}/${total} savolga javob berdingiz — barchasini javob bersangiz +1.0 ball ko'tariladi.`);
-  }
-  document.getElementById('resFeedback').innerHTML = feedback.map(f=>`<div class="text-[13px] leading-5">${f}</div>`).join('');
+  document.getElementById('resOverall').textContent = overall.toFixed(1);
+  document.getElementById('resFlu').textContent = flu.toFixed(1);
+  document.getElementById('resLex').textContent = lex.toFixed(1);
+  document.getElementById('resGram').textContent = gram.toFixed(1);
+  document.getElementById('resPron').textContent = pron.toFixed(1);
+  document.getElementById('resTotal').textContent = answered + ' / ' + total + ' javob';
+  document.getElementById('resTime').textContent = Math.floor(mockElapsed/60) + ':' + String(mockElapsed%60).padStart(2,'0');
+  const recEl = document.getElementById('resAudioCount');
+  if(recEl) recEl.textContent = recorded + ' audio yozuv';
+
+  document.getElementById('resFeedback').innerHTML = feedback.map(f => '<div class="text-[13px] leading-5">' + f + '</div>').join('');
+
   // === HAR BIR BO'LIM UCHUN ALOHIDA RO'YXAT: savol + sizning audio javobingiz + Best Answer ===
   renderMockResultsByPart();
   // save overall
@@ -1395,7 +1679,9 @@ async function initAccount(){
       accountEpoch++;
       if(unsubscribeProgress) unsubscribeProgress();
       accountReady=false; accountUser=user; progress=Object.create(null);
+      accountProfile = loadLocalProfile(user ? user.uid : null);
       // Discard session data on identity changes; never attach another user's work.
+      stopLiveTranscription(); mockTranscripts={}; mockConfidences={};
       clearInterval(mockTimerInterval); mockTimerInterval=null;
       clearInterval(dailyInterval); dailyInterval=null; dailyRunning=false; dailyRemaining=1200;
       if(mediaRecorder){ mediaRecorder.onstop=null; try{mediaRecorder.stop();}catch(e){} mediaRecorder.stream?.getTracks().forEach(t=>t.stop()); }
@@ -1422,7 +1708,17 @@ async function initAccount(){
         // Wait for server confirmation before enabling writes on a new device.
         if(snapshot.metadata.fromCache && !accountReady) return;
         progress=Object.create(null);
-        snapshot.forEach(doc=>{ if(isProgressKey(doc.id) && typeof doc.data().value==='string') progress[doc.id]=doc.data().value; });
+        snapshot.forEach(doc=>{
+          const val = doc.data() && doc.data().value;
+          if(doc.id === 'profile'){
+            try{
+              accountProfile = JSON.parse(val || '{}') || { name:'', avatar:'' };
+              if(user.uid){ try{ localStorage.setItem('profile_'+user.uid, val || ''); }catch(e){} }
+            }catch(e){ accountProfile = { name:'', avatar:'' }; }
+          } else if(isProgressKey(doc.id) && typeof val === 'string'){
+            progress[doc.id] = val;
+          }
+        });
         accountReady=true; refreshAccountProgress();
         if(!snapshot.metadata.hasPendingWrites) accountStatus('Akkaunt ma’lumotlari sinxronlandi.');
       }, ()=>{ if(epoch===accountEpoch){accountReady=false;accountStatus('Firestore bilan ulanishda xato. Internet va Security Rules sozlamalarini tekshiring.');} });
@@ -1437,8 +1733,17 @@ function refreshAccountProgress(){
 }
 function updateAccountControls(){
   const button=document.getElementById('accountButton');
-  button.textContent=accountUser ? (accountUser.displayName || accountUser.email) : "Kirish / Ro'yxatdan o'tish";
-  button.title=button.textContent;
+  const name = (accountProfile && accountProfile.name) || (accountUser && accountUser.displayName) || (accountUser && accountUser.email) || '';
+  if(accountUser){
+    const avatar = (accountProfile && accountProfile.avatar)
+      ? '<img class="account-btn-avatar" src="' + escapeHTML(accountProfile.avatar) + '" alt="">'
+      : '';
+    button.innerHTML = avatar + '<span class="account-btn-name">' + escapeHTML(name) + '</span>';
+    button.title = name || accountUser.email || '';
+  } else {
+    button.innerHTML = '<span class="account-btn-name">Kirish / Ro\'yxatdan o\'tish</span>';
+    button.title = '';
+  }
   document.getElementById('logoutButton').hidden=!accountUser;
   if(!document.getElementById('authModal').hidden) openAuth(accountUser?'account':'login');
 }
@@ -1485,7 +1790,11 @@ async function submitAuth(event){
       accountStatus('Agar bu email uchun akkaunt mavjud bo‘lsa, tiklash havolasi yuborildi. Spam papkasini ham tekshiring.');
     }else if(mode==='signup'){
       const credential=await firebaseAPI.createUserWithEmailAndPassword(accountAuth,email,password);
-      await firebaseAPI.updateProfile(credential.user,{displayName:document.getElementById('authName').value.trim()});
+      const dispName=document.getElementById('authName').value.trim();
+      try{ await firebaseAPI.updateProfile(credential.user,{displayName:dispName}); }catch(e){}
+      accountProfile = { name: dispName, avatar: '' };
+      try{ localStorage.setItem('profile_'+credential.user.uid, JSON.stringify(accountProfile)); }catch(e){}
+      try{ firebaseAPI.setDoc(firebaseAPI.doc(accountDB,'users',credential.user.uid,'progress','profile'), {value: JSON.stringify(accountProfile)}); }catch(e){}
       success=true;
     }else{await firebaseAPI.signInWithEmailAndPassword(accountAuth,email,password);success=true;}
   }catch(e){accountStatus(authError(e));}
@@ -1514,11 +1823,122 @@ async function importLegacyProgress(){
   }catch(e){accountStatus('Ko‘chirish tugamadi. Qayta urinib ko‘ring.');}
   finally{pendingWrites--;}
 }
+function loadLocalProfile(uid){
+  if(!uid) return { name:'', avatar:'' };
+  try{
+    const raw = localStorage.getItem('profile_'+uid);
+    if(!raw) return { name:'', avatar:'' };
+    const j = JSON.parse(raw);
+    return { name: sanitizeInput(j && j.name, 40), avatar: (j && j.avatar && /^data:image\//.test(j.avatar)) ? j.avatar : '' };
+  }catch(e){ return { name:'', avatar:'' }; }
+}
+function setText(id, val){ const el = document.getElementById(id); if(el) el.textContent = val; }
+
+function renderProfileUI(){
+  const rawName = (accountProfile && accountProfile.name) || (accountUser && accountUser.displayName) || '';
+  const fallback = accountUser && accountUser.email ? accountUser.email : 'Foydalanuvchi';
+  const elName = document.getElementById('accountName');
+  if(elName) elName.textContent = rawName || fallback;
+  const elEmail = document.getElementById('accountEmail');
+  if(elEmail) elEmail.textContent = accountUser ? accountUser.email : '';
+  const nameInput = document.getElementById('accountNameInput');
+  if(nameInput && document.activeElement !== nameInput) nameInput.value = rawName;
+  const img = document.getElementById('accountAvatarImg');
+  const initial = document.getElementById('accountAvatarInitial');
+  if(accountProfile && accountProfile.avatar){
+    if(img){ img.src = accountProfile.avatar; img.style.display = 'block'; }
+    if(initial) initial.style.display = 'none';
+  } else {
+    if(img){ img.removeAttribute('src'); img.style.display = 'none'; }
+    if(initial){
+      initial.style.display = 'grid';
+      const ch = (rawName || fallback).trim().charAt(0).toUpperCase() || 'U';
+      initial.textContent = ch;
+    }
+  }
+}
+
+function saveProfile(patch){
+  accountProfile = Object.assign({}, accountProfile, patch || {});
+  accountProfile.name = sanitizeInput(accountProfile.name, 40);
+  if(accountProfile.avatar && !/^data:image\//.test(accountProfile.avatar)) accountProfile.avatar = '';
+  if(accountUser && accountUser.uid){
+    try{ localStorage.setItem('profile_'+accountUser.uid, JSON.stringify(accountProfile)); }catch(e){}
+  }
+  if(accountUser && accountDB && firebaseAPI){
+    firebaseAPI.setDoc(firebaseAPI.doc(accountDB,'users',accountUser.uid,'progress','profile'), { value: JSON.stringify(accountProfile) })
+      .catch(()=>{ accountStatus('Profil bulutga saqlanmadi \u2014 Firestore qoidalarini yangilang.'); });
+  }
+  renderProfileUI();
+  updateAccountControls();
+}
+
+function handleAvatarChange(e){
+  const file = e.target && e.target.files && e.target.files[0];
+  if(e.target) e.target.value = '';
+  if(!file) return;
+  if(!/^image\//.test(file.type)){ accountStatus('Iltimos, rasm faylini tanlang.'); return; }
+  if(file.size > 5 * 1024 * 1024){ accountStatus('Rasm 5MB dan katta bo\u2018lmasin.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      try{
+        const size = 200;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const s = Math.min(img.width, img.height);
+        const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+        ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+        const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+        if(!dataURL || dataURL.length > 800000){ accountStatus('Rasmni qayta ishlab bo\u2018lmadi.'); return; }
+        saveProfile({ avatar: dataURL });
+        accountStatus('Profil rasmi yangilandi.');
+      }catch(err){ accountStatus('Rasmni qayta ishlab bo\u2018lmadi.'); }
+    };
+    img.onerror = () => accountStatus('Rasm ochilmadi.');
+    img.src = reader.result;
+  };
+  reader.onerror = () => accountStatus('Faylni o\u2018qib bo\u2018lmadi.');
+  reader.readAsDataURL(file);
+}
+
+async function saveNickname(){
+  const input = document.getElementById('accountNameInput');
+  const name = sanitizeInput(input ? input.value : '', 40);
+  if(!name){ accountStatus('Ism (nickname) kiriting.'); return; }
+  saveProfile({ name });
+  if(accountUser && accountAuth && firebaseAPI){
+    try{ await firebaseAPI.updateProfile(accountUser, { displayName: name }); }catch(e){}
+  }
+  accountStatus('Nickname saqlandi.');
+}
+
 function renderAccountHistory(){
-  const target=document.getElementById('accountHistory'); if(!target) return;
-  const recordings=Object.keys(progress).filter(k=>k.startsWith('recs_')).flatMap(k=>safeJSON(k,[]).map(r=>({...r,topic:k.slice(5)})));
-  const mocks=safeJSON('mockSavesMeta',[]);
-  target.innerHTML=`<p>Tugallangan mavzular: ${safeJSON('completedTopics',[]).length}</p><p>Audio yozuvlar tarixi: ${recordings.length+mocks.length}</p>`+
-    [...recordings,...mocks].slice(-100).reverse().map(r=>`<p>${escapeHTML(r.q || r.topic)} • ${escapeHTML(new Date(r.date).toLocaleString())}${r.duration?' • '+escapeHTML(r.duration)+' s':''}</p>`).join('')+
-    '<p>Audio tarixi faqat metama’lumotlarni saqlaydi. Audio fayllar joriy mashq davomida tinglanadi.</p>';
+  renderProfileUI();
+  const mocks = safeJSON('mockHistory', []);
+  setText('statMockCount', String(mocks.length));
+  const bands = mocks.map(h => parseFloat(h.overall)).filter(b => isFinite(b) && b > 0);
+  setText('statBestBand', bands.length ? Math.max.apply(null, bands).toFixed(1) : '\u2014');
+  setText('statStreak', String(streak) + ' kun');
+  setText('statDailyDone', String(safeJSON('dailyHistory', []).length));
+  const listEl = document.getElementById('accountMockList');
+  if(listEl){
+    if(!mocks.length){
+      listEl.innerHTML = '<div class="account-empty">Hali mock topshirmadingiz.</div>';
+    } else {
+      listEl.innerHTML = mocks.slice(0, 10).map(h => {
+        const d = new Date(h.date);
+        const badge = h.status === 'completed' ? (h.overall > 0 ? h.overall : '\u2713') : '\u2022';
+        return '<div class="account-mock-row">' +
+          '<span class="account-mock-badge' + (h.status === 'completed' ? ' done' : '') + '">' + escapeHTML(String(badge)) + '</span>' +
+          '<div class="account-mock-meta">' +
+            '<div class="t">' + escapeHTML(d.toLocaleDateString()) + ' \u2022 ' + escapeHTML(d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})) + '</div>' +
+            '<div class="s">' + escapeHTML(String(h.total || 11)) + ' savol \u2022 ' + escapeHTML(h.status === 'completed' ? 'Yakunlandi' : 'Boshlangan') + (h.answered != null ? ' \u2022 ' + h.answered + ' javob' : '') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+  }
 }
