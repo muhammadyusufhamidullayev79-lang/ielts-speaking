@@ -1220,59 +1220,193 @@ function hideMockResults(){
   const el=document.getElementById('mockResults');
   if(el) el.classList.add('hidden');
 }
-function roundHalf(n){ return (Math.round(n*2)/2).toFixed(1); }
-function showMockResults(){
-  const meta = safeJSON('mockSavesMeta',[]);
+/* ================= MOCK AUDIO TAHLILI & BAHOLASH ================= */
+const PART_TARGETS = {
+  'Part 1': { min: 6, good: 12, great: 18, label: '12\u201330 soniya' },
+  'Part 2': { min: 35, good: 60, great: 90, label: '1:30\u20132:00 daqiqa' },
+  'Part 3': { min: 7, good: 15, great: 25, label: '15\u201340 soniya' }
+};
+
+// Yozuvni VAD (voice activity detection) bilan tahlil qiladi:
+// haqiqiy gapirish vaqti, pauzalar, ovoz darajasi.
+async function analyzeRecording(blob){
+  const info = { ok:false, totalSec:0, voicedSec:0, speechRatio:0, pauses:0, longPauses:0, maxPause:0, rms:0 };
+  if(!blob) return info;
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return info;
+    const ctx = new AC();
+    try{
+      const buf = await blob.arrayBuffer();
+      const audio = await ctx.decodeAudioData(buf);
+      const ch = audio.getChannelData(0);
+      const sr = audio.sampleRate;
+      const frame = Math.max(64, Math.floor(sr * 0.03));
+      const rmsArr = [];
+      let maxRms = 0, sumRms = 0;
+      for(let i = 0; i < ch.length; i += frame){
+        let s = 0; const end = Math.min(i + frame, ch.length); const n = end - i;
+        for(let j = i; j < end; j++){ const v = ch[j]; s += v * v; }
+        const rms = Math.sqrt(s / n);
+        rmsArr.push(rms); sumRms += rms; if(rms > maxRms) maxRms = rms;
+      }
+      if(!rmsArr.length) return info;
+      const frameSec = frame / sr;
+      const thresh = Math.max(0.006, maxRms * 0.05);
+      let voiced = 0, total = 0, curSilence = 0, pauses = 0, longPauses = 0, maxPause = 0;
+      for(const r of rmsArr){
+        total += frameSec;
+        if(r >= thresh){
+          voiced += frameSec;
+          if(curSilence > 0.5){ pauses++; if(curSilence > maxPause) maxPause = curSilence; if(curSilence >= 1.2) longPauses++; }
+          curSilence = 0;
+        } else {
+          curSilence += frameSec;
+        }
+      }
+      if(curSilence > 0.5){ pauses++; if(curSilence > maxPause) maxPause = curSilence; if(curSilence >= 1.2) longPauses++; }
+      info.ok = true;
+      info.totalSec = total;
+      info.voicedSec = voiced;
+      info.speechRatio = total ? (voiced / total) : 0;
+      info.pauses = pauses;
+      info.longPauses = longPauses;
+      info.maxPause = Math.round(maxPause * 10) / 10;
+      info.rms = rmsArr.length ? (sumRms / rmsArr.length) : 0;
+    } finally { try{ ctx.close(); }catch(e){} }
+  }catch(e){ /* decode qo'llab-quvvatlanmasa, pastda konservativ fallback */ }
+  return info;
+}
+
+async function analyzeMockSession(){
+  const recs = (mockSessionSaves || []).filter(r => mockAnsweredMap[r.qIdx]);
+  const out = [];
+  await Promise.all(recs.map(async r => {
+    const item = mockQueue[r.qIdx];
+    const a = await analyzeRecording(r.blob);
+    a.qIdx = r.qIdx;
+    a.part = item ? item.part : 'Part 1';
+    a.wallSec = r.duration || 0;
+    if(!a.ok){
+      // audio decode ishlamasa — yozuv davomiyligiga qarab konservativ baho
+      a.estimated = true;
+      a.totalSec = a.wallSec || 0;
+      a.voicedSec = Math.max(0, (a.wallSec || 0) * 0.6);
+      a.speechRatio = 0.6;
+    }
+    out.push(a);
+  }));
+  return out;
+}
+
+function lengthScore(voicedSec, part){
+  const t = PART_TARGETS[part] || PART_TARGETS['Part 1'];
+  if(voicedSec >= t.great) return 1;
+  if(voicedSec >= t.good) return 0.8 + 0.2 * ((voicedSec - t.good) / (t.great - t.good));
+  if(voicedSec >= t.min) return 0.55 + 0.25 * ((voicedSec - t.min) / (t.good - t.min));
+  if(voicedSec > 0) return 0.2 + 0.35 * (voicedSec / t.min);
+  return 0;
+}
+function continuityScore(speechRatio){
+  if(speechRatio >= 0.85) return 0.95;
+  if(speechRatio >= 0.75) return 0.8 + 0.15 * ((speechRatio - 0.75) / 0.1);
+  if(speechRatio >= 0.6) return 0.65 + 0.15 * ((speechRatio - 0.6) / 0.15);
+  if(speechRatio >= 0.45) return 0.5 + 0.15 * ((speechRatio - 0.45) / 0.15);
+  return Math.max(0.05, 0.45 * (speechRatio / 0.45));
+}
+function clampBand(raw, comp){
+  let b = Math.round((raw * comp) * 2) / 2; // 0.5 qadam
+  b = Math.min(9, Math.max(3, b));
+  return b;
+}
+
+// Ballar endi faqat o'lchangan signallardan kelib chiqadi (random/bonus yo'q).
+function computeBands(analyses, answered, total){
+  const n = analyses.length;
+  const avg = f => n ? analyses.reduce((s, a) => s + f(a), 0) / n : 0;
+  const lenAvg = avg(a => lengthScore(a.voicedSec, a.part));
+  const contAvg = avg(a => continuityScore(a.speechRatio));
+  const levelAvg = avg(a => Math.min(1, a.rms * 6));
+  const longPauses = analyses.reduce((s, a) => s + (a.longPauses || 0), 0);
+  const maxPause = analyses.reduce((s, a) => Math.max(s, a.maxPause || 0), 0);
+  const ratio = total ? (answered / total) : 0;
+  const comp = 0.35 + 0.65 * ratio;
+
+  const pausePen = Math.min(1.5, longPauses * 0.2 + (maxPause >= 5 ? 0.5 : 0));
+  const flu  = clampBand(2.5 + (contAvg * 0.75 + lenAvg * 0.25) * 6.5 - pausePen, comp);
+  const lex  = clampBand(2.5 + (lenAvg * 0.8 + contAvg * 0.2) * 6.5, comp);
+  const gram = clampBand(2.5 + (lenAvg * 0.5 + contAvg * 0.5) * 6.5, comp);
+  const pron = clampBand(2.5 + (levelAvg * 0.25 + contAvg * 0.5 + lenAvg * 0.25) * 6.5, comp);
+
+  return { flu, lex, gram, pron, ratio, longPauses, maxPause, lenAvg, contAvg };
+}
+
+function buildMockFeedback(b, analyses, answered, total){
+  const f = [];
+  f.push(answered + ' / ' + total + ' savolga javob berdingiz.');
+  f.push('Nutq davomiyligi: yozuv vaqtining ~' + Math.round(b.contAvg * 100) + '% qismida haqiqatdan gapirgansiz (pauza emas).');
+  if(b.longPauses > 0) f.push(b.longPauses + ' ta uzun pauza aniqlandi \u2014 oqimni saqlash uchun pauzalarni qisqartiring.');
+  if(b.maxPause >= 3) f.push('Eng uzun pauza ' + b.maxPause.toFixed(1) + ' soniya.');
+
+  const weak = analyses.filter(a => a.voicedSec < (PART_TARGETS[a.part] || PART_TARGETS['Part 1']).min);
+  if(weak.length){
+    const byPart = {};
+    weak.forEach(a => { (byPart[a.part] = byPart[a.part] || []).push(a); });
+    Object.keys(byPart).forEach(p => {
+      f.push(p + ': ' + byPart[p].length + ' ta javob juda qisqa \u2014 har biri kamida ' + PART_TARGETS[p].label + ' bo\u2018lsin.');
+    });
+  }
+
+  if(b.flu < 6) f.push('Fluency: pauzalarni kamaytirib, bog\u2018lovchilar (however, moreover, actually) ishlating.');
+  else f.push('Fluency: yaxshi oqim \u2014 shu tempni saqlang!');
+  if(b.lex < 6) f.push('Lexical: javoblarni uzaytirib, mavzuga oid 2-3 akademik so\u2018z qo\u2018shing.');
+  else f.push('Lexical: so\u2018z boyligi yaxshi.');
+  if(b.gram < 6) f.push('Grammar: complex sentences (if, although, which, while) ko\u2018paytiring.');
+  else f.push('Grammar: tuzilma barqaror.');
+  if(b.pron < 6) f.push('Pronunciation: aniqroq va balandroq gapiring \u2014 AI ovozini tinglab, talaffuzni takrorlang.');
+  else f.push('Pronunciation: ovoz tiniq va barqaror.');
+  f.push('Eslatma: ballar yozuvingizning haqiqiy o\u2018lchovlaridan (gapirish vaqti, pauzalar, ovoz sifati) hisoblanadi \u2014 endi hammaga bir xil 7.5\u20138.0 qo\u2018yilmaydi.');
+  return f;
+}
+
+async function showMockResults(){
   const total = mockQueue.length;
   const answered = mockSessionAnswered; // per-mock session, resets each mock
   const recorded = mockSessionSaves.length;
-  // IELTS scoring: 0.5 increments, 0 if no answers
-  let flu, lex, gram, pron, overall;
-  const ratio = total ? answered/total : 0;
-  if(answered === 0){
-    flu = lex = gram = pron = overall = "0.0";
-  } else {
-    // base 4.0-7.5 depending on ratio, plus time bonus if mockElapsed reasonable (8-14 min)
-    const timeBonus = (mockElapsed >= 480 && mockElapsed <= 840) ? 0.5 : 0;
-    const base = 4.0 + ratio*3.5 + timeBonus; // 4.0 to 8.0
-    flu = roundHalf(Math.min(9, Math.max(4.0, base + (Math.random()-0.5)*0.8)));
-    lex = roundHalf(Math.min(9, Math.max(4.0, base + 0.2 + (Math.random()-0.5)*0.7)));
-    gram = roundHalf(Math.min(9, Math.max(4.0, base + (Math.random()-0.5)*0.7)));
-    pron = roundHalf(Math.min(9, Math.max(4.0, base + 0.3 + (Math.random()-0.5)*0.6)));
-    // IELTS overall is average, rounded to nearest 0.5 (0.25 up to 0.5, 0.75 up to next)
-    const avg = (parseFloat(flu)+parseFloat(lex)+parseFloat(gram)+parseFloat(pron))/4;
-    overall = roundHalf(avg);
-  }
   const el = document.getElementById('mockResults');
   if(!el) return;
+
+  let analyses = [];
+  if(answered > 0) analyses = await analyzeMockSession();
+
+  let flu, lex, gram, pron, overall, feedback;
+  if(answered === 0){
+    flu = lex = gram = pron = overall = 0;
+    feedback = [
+      'Hech bir savolga javob bermadingiz \u2014 natija 0.0.',
+      'Har bir savolda \u201CRecord\u201D bosing, javob bering va \u201CSaqlash\u201D tugmasini bosing.'
+    ];
+  } else {
+    const b = computeBands(analyses, answered, total);
+    flu = b.flu; lex = b.lex; gram = b.gram; pron = b.pron;
+    overall = Math.round(((flu + lex + gram + pron) / 4) * 2) / 2;
+    feedback = buildMockFeedback(b, analyses, answered, total);
+  }
+
   el.classList.remove('hidden');
   if(el.scrollIntoView) try{el.scrollIntoView({behavior:'smooth'});}catch(e){}
-  document.getElementById('resOverall').textContent = overall;
-  document.getElementById('resFlu').textContent = flu;
-  document.getElementById('resLex').textContent = lex;
-  document.getElementById('resGram').textContent = gram;
-  document.getElementById('resPron').textContent = pron;
-  document.getElementById('resTotal').textContent = `${answered} / ${total} javob`;
-  document.getElementById('resTime').textContent = `${Math.floor(mockElapsed/60)}:${String(mockElapsed%60).padStart(2,'0')}`;
-  const recEl=document.getElementById('resAudioCount');
-  if(recEl) recEl.textContent = `${recorded} audio yozuv`;
-  // feedback - handle 0 and realistic
-  const feedback = [];
-  if(answered === 0){
-    feedback.push("• Hech bir savolga javob bermadingiz — Mock 0.0. Iltimos, har bir savolga kamida 20-30 soniya javob bering va Record bosing.");
-    feedback.push("• Maslahat: Part 1 da 1-2 gap, Part 2 da 1.5-2 daqiqa, Part 3 da 3-4 gap bilan to'liq javob bering.");
-  } else {
-    if(parseFloat(flu) < 6.0) feedback.push("• Fluency: ko'proq bog'lovchilar (however, moreover, actually) va pauzalarsiz gapiring. Har bir javobni 30-60 soniya cho'zing.");
-    else feedback.push("• Fluency: yaxshi oqim, shu tempni saqlang!");
-    if(parseFloat(lex) < 6.0) feedback.push("• Lexical: mavzuga oid 2-3 ta akademik so'z (e.g., infrastructure, sustainable, heritage) qo'shing.");
-    else feedback.push("• Lexical: boy so'z boyligi, ajoyib!");
-    if(parseFloat(gram) < 6.0) feedback.push("• Grammar: complex sentences (if, although, which, while) ko'paytiring.");
-    else feedback.push("• Grammar: tuzilma aniq, xatolar kam.");
-    if(parseFloat(pron) < 6.0) feedback.push("• Pronunciation: AI ovozini tinglab, intonatsiyani takrorlang, yozib o'zingizni tinglang.");
-    else feedback.push("• Pronunciation: talaffuz tiniq!");
-    if(ratio < 1) feedback.push(`• To'liqlik: ${answered}/${total} savolga javob berdingiz — barchasini javob bersangiz +1.0 ball ko'tariladi.`);
-  }
-  document.getElementById('resFeedback').innerHTML = feedback.map(f=>`<div class="text-[13px] leading-5">${f}</div>`).join('');
+  document.getElementById('resOverall').textContent = overall.toFixed(1);
+  document.getElementById('resFlu').textContent = flu.toFixed(1);
+  document.getElementById('resLex').textContent = lex.toFixed(1);
+  document.getElementById('resGram').textContent = gram.toFixed(1);
+  document.getElementById('resPron').textContent = pron.toFixed(1);
+  document.getElementById('resTotal').textContent = answered + ' / ' + total + ' javob';
+  document.getElementById('resTime').textContent = Math.floor(mockElapsed/60) + ':' + String(mockElapsed%60).padStart(2,'0');
+  const recEl = document.getElementById('resAudioCount');
+  if(recEl) recEl.textContent = recorded + ' audio yozuv';
+
+  document.getElementById('resFeedback').innerHTML = feedback.map(f => '<div class="text-[13px] leading-5">' + f + '</div>').join('');
+
   // === HAR BIR BO'LIM UCHUN ALOHIDA RO'YXAT: savol + sizning audio javobingiz + Best Answer ===
   renderMockResultsByPart();
   // save overall
