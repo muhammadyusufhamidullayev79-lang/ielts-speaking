@@ -27,6 +27,7 @@ document.addEventListener('visibilitychange', ()=>{
 const PROGRESS_KEYS = new Set(['mockHistory','mockSavesMeta','mockDone','lastMockIds','dailyNum','streak','dailyHistory','completedTopics']);
 const isProgressKey = k => PROGRESS_KEYS.has(k) || /^recs_[a-zA-Z0-9_-]+$/.test(k);
 let accountUser = null, accountReady = false, progress = Object.create(null);
+let accountProfile = { name: '', avatar: '' };  // foydalanuvchi profili (nickname + avatar)
 let firebaseAPI, accountAuth, accountDB, unsubscribeProgress, accountEpoch = 0;
 let pendingWrites = 0, authMode = 'login', authBusy = false, authReturnFocus;
 function safeGet(k, d=null){
@@ -1295,6 +1296,7 @@ window.closeMockResults=closeMockResults; window.revealMockAnswer=revealMockAnsw
 window.downloadMockReport=downloadMockReport; window.hideMockResults=hideMockResults;
 window.completeDaily=completeDaily; window.skipDaily=skipDaily; window.renderMockHistory=renderMockHistory;
 window.restartDaily=restartDaily; window.resetDailyProgress=resetDailyProgress; window.resetDailyLesson=resetDailyLesson;
+window.handleAvatarChange=handleAvatarChange; window.saveNickname=saveNickname;
 
 function closeMockResults(){ hideMockResults(); }
 function hideMockResults(){
@@ -1677,6 +1679,7 @@ async function initAccount(){
       accountEpoch++;
       if(unsubscribeProgress) unsubscribeProgress();
       accountReady=false; accountUser=user; progress=Object.create(null);
+      accountProfile = loadLocalProfile(user ? user.uid : null);
       // Discard session data on identity changes; never attach another user's work.
       stopLiveTranscription(); mockTranscripts={}; mockConfidences={};
       clearInterval(mockTimerInterval); mockTimerInterval=null;
@@ -1705,7 +1708,17 @@ async function initAccount(){
         // Wait for server confirmation before enabling writes on a new device.
         if(snapshot.metadata.fromCache && !accountReady) return;
         progress=Object.create(null);
-        snapshot.forEach(doc=>{ if(isProgressKey(doc.id) && typeof doc.data().value==='string') progress[doc.id]=doc.data().value; });
+        snapshot.forEach(doc=>{
+          const val = doc.data() && doc.data().value;
+          if(doc.id === 'profile'){
+            try{
+              accountProfile = JSON.parse(val || '{}') || { name:'', avatar:'' };
+              if(user.uid){ try{ localStorage.setItem('profile_'+user.uid, val || ''); }catch(e){} }
+            }catch(e){ accountProfile = { name:'', avatar:'' }; }
+          } else if(isProgressKey(doc.id) && typeof val === 'string'){
+            progress[doc.id] = val;
+          }
+        });
         accountReady=true; refreshAccountProgress();
         if(!snapshot.metadata.hasPendingWrites) accountStatus('Akkaunt ma’lumotlari sinxronlandi.');
       }, ()=>{ if(epoch===accountEpoch){accountReady=false;accountStatus('Firestore bilan ulanishda xato. Internet va Security Rules sozlamalarini tekshiring.');} });
@@ -1720,8 +1733,17 @@ function refreshAccountProgress(){
 }
 function updateAccountControls(){
   const button=document.getElementById('accountButton');
-  button.textContent=accountUser ? (accountUser.displayName || accountUser.email) : "Kirish / Ro'yxatdan o'tish";
-  button.title=button.textContent;
+  const name = (accountProfile && accountProfile.name) || (accountUser && accountUser.displayName) || (accountUser && accountUser.email) || '';
+  if(accountUser){
+    const avatar = (accountProfile && accountProfile.avatar)
+      ? '<img class="account-btn-avatar" src="' + escapeHTML(accountProfile.avatar) + '" alt="">'
+      : '';
+    button.innerHTML = avatar + '<span class="account-btn-name">' + escapeHTML(name) + '</span>';
+    button.title = name || accountUser.email || '';
+  } else {
+    button.innerHTML = '<span class="account-btn-name">Kirish / Ro\'yxatdan o\'tish</span>';
+    button.title = '';
+  }
   document.getElementById('logoutButton').hidden=!accountUser;
   if(!document.getElementById('authModal').hidden) openAuth(accountUser?'account':'login');
 }
@@ -1768,7 +1790,11 @@ async function submitAuth(event){
       accountStatus('Agar bu email uchun akkaunt mavjud bo‘lsa, tiklash havolasi yuborildi. Spam papkasini ham tekshiring.');
     }else if(mode==='signup'){
       const credential=await firebaseAPI.createUserWithEmailAndPassword(accountAuth,email,password);
-      await firebaseAPI.updateProfile(credential.user,{displayName:document.getElementById('authName').value.trim()});
+      const dispName=document.getElementById('authName').value.trim();
+      try{ await firebaseAPI.updateProfile(credential.user,{displayName:dispName}); }catch(e){}
+      accountProfile = { name: dispName, avatar: '' };
+      try{ localStorage.setItem('profile_'+credential.user.uid, JSON.stringify(accountProfile)); }catch(e){}
+      try{ firebaseAPI.setDoc(firebaseAPI.doc(accountDB,'users',credential.user.uid,'progress','profile'), {value: JSON.stringify(accountProfile)}); }catch(e){}
       success=true;
     }else{await firebaseAPI.signInWithEmailAndPassword(accountAuth,email,password);success=true;}
   }catch(e){accountStatus(authError(e));}
@@ -1797,11 +1823,122 @@ async function importLegacyProgress(){
   }catch(e){accountStatus('Ko‘chirish tugamadi. Qayta urinib ko‘ring.');}
   finally{pendingWrites--;}
 }
+function loadLocalProfile(uid){
+  if(!uid) return { name:'', avatar:'' };
+  try{
+    const raw = localStorage.getItem('profile_'+uid);
+    if(!raw) return { name:'', avatar:'' };
+    const j = JSON.parse(raw);
+    return { name: sanitizeInput(j && j.name, 40), avatar: (j && j.avatar && /^data:image\//.test(j.avatar)) ? j.avatar : '' };
+  }catch(e){ return { name:'', avatar:'' }; }
+}
+function setText(id, val){ const el = document.getElementById(id); if(el) el.textContent = val; }
+
+function renderProfileUI(){
+  const rawName = (accountProfile && accountProfile.name) || (accountUser && accountUser.displayName) || '';
+  const fallback = accountUser && accountUser.email ? accountUser.email : 'Foydalanuvchi';
+  const elName = document.getElementById('accountName');
+  if(elName) elName.textContent = rawName || fallback;
+  const elEmail = document.getElementById('accountEmail');
+  if(elEmail) elEmail.textContent = accountUser ? accountUser.email : '';
+  const nameInput = document.getElementById('accountNameInput');
+  if(nameInput && document.activeElement !== nameInput) nameInput.value = rawName;
+  const img = document.getElementById('accountAvatarImg');
+  const initial = document.getElementById('accountAvatarInitial');
+  if(accountProfile && accountProfile.avatar){
+    if(img){ img.src = accountProfile.avatar; img.style.display = 'block'; }
+    if(initial) initial.style.display = 'none';
+  } else {
+    if(img){ img.removeAttribute('src'); img.style.display = 'none'; }
+    if(initial){
+      initial.style.display = 'grid';
+      const ch = (rawName || fallback).trim().charAt(0).toUpperCase() || 'U';
+      initial.textContent = ch;
+    }
+  }
+}
+
+function saveProfile(patch){
+  accountProfile = Object.assign({}, accountProfile, patch || {});
+  accountProfile.name = sanitizeInput(accountProfile.name, 40);
+  if(accountProfile.avatar && !/^data:image\//.test(accountProfile.avatar)) accountProfile.avatar = '';
+  if(accountUser && accountUser.uid){
+    try{ localStorage.setItem('profile_'+accountUser.uid, JSON.stringify(accountProfile)); }catch(e){}
+  }
+  if(accountUser && accountDB && firebaseAPI){
+    firebaseAPI.setDoc(firebaseAPI.doc(accountDB,'users',accountUser.uid,'progress','profile'), { value: JSON.stringify(accountProfile) })
+      .catch(()=>{ accountStatus('Profil bulutga saqlanmadi \u2014 Firestore qoidalarini yangilang.'); });
+  }
+  renderProfileUI();
+  updateAccountControls();
+}
+
+function handleAvatarChange(e){
+  const file = e.target && e.target.files && e.target.files[0];
+  if(e.target) e.target.value = '';
+  if(!file) return;
+  if(!/^image\//.test(file.type)){ accountStatus('Iltimos, rasm faylini tanlang.'); return; }
+  if(file.size > 5 * 1024 * 1024){ accountStatus('Rasm 5MB dan katta bo\u2018lmasin.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      try{
+        const size = 200;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const s = Math.min(img.width, img.height);
+        const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+        ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+        const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+        if(!dataURL || dataURL.length > 800000){ accountStatus('Rasmni qayta ishlab bo\u2018lmadi.'); return; }
+        saveProfile({ avatar: dataURL });
+        accountStatus('Profil rasmi yangilandi.');
+      }catch(err){ accountStatus('Rasmni qayta ishlab bo\u2018lmadi.'); }
+    };
+    img.onerror = () => accountStatus('Rasm ochilmadi.');
+    img.src = reader.result;
+  };
+  reader.onerror = () => accountStatus('Faylni o\u2018qib bo\u2018lmadi.');
+  reader.readAsDataURL(file);
+}
+
+async function saveNickname(){
+  const input = document.getElementById('accountNameInput');
+  const name = sanitizeInput(input ? input.value : '', 40);
+  if(!name){ accountStatus('Ism (nickname) kiriting.'); return; }
+  saveProfile({ name });
+  if(accountUser && accountAuth && firebaseAPI){
+    try{ await firebaseAPI.updateProfile(accountUser, { displayName: name }); }catch(e){}
+  }
+  accountStatus('Nickname saqlandi.');
+}
+
 function renderAccountHistory(){
-  const target=document.getElementById('accountHistory'); if(!target) return;
-  const recordings=Object.keys(progress).filter(k=>k.startsWith('recs_')).flatMap(k=>safeJSON(k,[]).map(r=>({...r,topic:k.slice(5)})));
-  const mocks=safeJSON('mockSavesMeta',[]);
-  target.innerHTML=`<p>Tugallangan mavzular: ${safeJSON('completedTopics',[]).length}</p><p>Audio yozuvlar tarixi: ${recordings.length+mocks.length}</p>`+
-    [...recordings,...mocks].slice(-100).reverse().map(r=>`<p>${escapeHTML(r.q || r.topic)} • ${escapeHTML(new Date(r.date).toLocaleString())}${r.duration?' • '+escapeHTML(r.duration)+' s':''}</p>`).join('')+
-    '<p>Audio tarixi faqat metama’lumotlarni saqlaydi. Audio fayllar joriy mashq davomida tinglanadi.</p>';
+  renderProfileUI();
+  const mocks = safeJSON('mockHistory', []);
+  setText('statMockCount', String(mocks.length));
+  const bands = mocks.map(h => parseFloat(h.overall)).filter(b => isFinite(b) && b > 0);
+  setText('statBestBand', bands.length ? Math.max.apply(null, bands).toFixed(1) : '\u2014');
+  setText('statStreak', String(streak) + ' kun');
+  setText('statDailyDone', String(safeJSON('dailyHistory', []).length));
+  const listEl = document.getElementById('accountMockList');
+  if(listEl){
+    if(!mocks.length){
+      listEl.innerHTML = '<div class="account-empty">Hali mock topshirmadingiz.</div>';
+    } else {
+      listEl.innerHTML = mocks.slice(0, 10).map(h => {
+        const d = new Date(h.date);
+        const badge = h.status === 'completed' ? (h.overall > 0 ? h.overall : '\u2713') : '\u2022';
+        return '<div class="account-mock-row">' +
+          '<span class="account-mock-badge' + (h.status === 'completed' ? ' done' : '') + '">' + escapeHTML(String(badge)) + '</span>' +
+          '<div class="account-mock-meta">' +
+            '<div class="t">' + escapeHTML(d.toLocaleDateString()) + ' \u2022 ' + escapeHTML(d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})) + '</div>' +
+            '<div class="s">' + escapeHTML(String(h.total || 11)) + ' savol \u2022 ' + escapeHTML(h.status === 'completed' ? 'Yakunlandi' : 'Boshlangan') + (h.answered != null ? ' \u2022 ' + h.answered + ' javob' : '') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+  }
 }

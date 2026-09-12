@@ -7,7 +7,7 @@ service cloud.firestore {
       }
       function validKey() {
         return key in ['mockHistory', 'mockSavesMeta', 'mockDone', 'lastMockIds',
-                       'dailyNum', 'streak', 'dailyHistory', 'completedTopics']
+                       'dailyNum', 'streak', 'dailyHistory', 'completedTopics', 'profile']
           || key.matches('recs_[a-zA-Z0-9_-]+');
       }
       allow read, delete: if owner();
