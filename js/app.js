@@ -114,6 +114,11 @@ let mockAnsweredMap = {};         // qIdx -> true (user pressed "Saqlash")
 let mockAnswersMeta = [];         // [{qIdx, part, q, duration, date}]
 let mockRevealAnswer = false;     // Best Answer ko'rsatish (mock davomida yopiq)
 
+// Speech-to-text (Web Speech API) — mock yozuvi davomida jonli transkripsiya
+let recognition = null;
+let mockTranscripts = {};        // qIdx -> yakuniy matn
+let mockConfidences = {};        // qIdx -> { sum, count } (ASR ishonch darajasi)
+
 // daily
 let dailyInterval = null;
 let dailyRemaining = 20*60;
@@ -237,7 +242,7 @@ function router(view){
   const allowed=['home','part1','part2','part3','mock','daily'];
   if(!allowed.includes(view)) view='home';
   // cleanup media/recording when leaving mock
-  if(view!=='mock'){ try{ stopSpeak(); }catch(e){} try{ if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop(); }catch(e){} try{ if(window._modalRecIntv) clearInterval(window._modalRecIntv); }catch(e){} }
+  if(view!=='mock'){ try{ stopSpeak(); }catch(e){} try{ stopLiveTranscription(); }catch(e){} try{ if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop(); }catch(e){} try{ if(window._modalRecIntv) clearInterval(window._modalRecIntv); }catch(e){} }
   // pause daily timer if leaving daily (keep state but stop tick)
   // (daily timer continues only if user explicitly started, but we reduce CPU by not ticking when hidden)
   document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));
@@ -617,16 +622,16 @@ function buildMockQueue(){
   // filter out lastIds if possible
   let p1Filtered = p1Pool.filter(t=>!lastIds.includes(t.id));
   if(p1Filtered.length < 6) p1Filtered = p1Pool;
-  const p1 = p1Filtered.slice(0,6).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 1', badge:'PART 1', q:q.q, a:q.a, hint:q.tip, id:t.id})));
+  const p1 = p1Filtered.slice(0,6).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 1', badge:'PART 1', q:q.q, a:q.a, hint:q.tip, id:t.id, vocab:q.vocab})));
   // Part2: pick cue card not in lastIds
   let p2Pool = shuffleArray(DATA.part2);
   let p2Filtered = p2Pool.filter(t=>!lastIds.includes(t.id));
   const p2topic = (p2Filtered[0] || p2Pool[0]);
-  const p2 = [{part:'Part 2', badge:'PART 2 • CUE CARD', q: `${p2topic.title}. ${p2topic.prompts.join('. ')}.`, a:p2topic.answer, hint:p2topic.tip, id:p2topic.id, isCue:true, prompts:p2topic.prompts, title:p2topic.title}];
+  const p2 = [{part:'Part 2', badge:'PART 2 • CUE CARD', q: `${p2topic.title}. ${p2topic.prompts.join('. ')}.`, a:p2topic.answer, hint:p2topic.tip, id:p2topic.id, isCue:true, prompts:p2topic.prompts, title:p2topic.title, vocab:p2topic.vocab}];
   let p3Pool = shuffleArray(DATA.part3);
   let p3Filtered = p3Pool.filter(t=>!lastIds.includes(t.id));
   if(p3Filtered.length < 4) p3Filtered = p3Pool;
-  const p3 = p3Filtered.slice(0,4).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 3', badge:'PART 3', q:q.q, a:q.a, hint:q.tip, id:t.id})));
+  const p3 = p3Filtered.slice(0,4).flatMap(t=> t.questions.slice(0,1).map(q=> ({part:'Part 3', badge:'PART 3', q:q.q, a:q.a, hint:q.tip, id:t.id, vocab:q.vocab})));
   const queue = [...p1, ...p2, ...p3];
   // save ids for next time
   const ids = [...p1Filtered.slice(0,6).map(t=>t.id), p2topic.id, ...p3Filtered.slice(0,4).map(t=>t.id)];
@@ -643,6 +648,9 @@ function startMock(){
   mockAnsweredMap={};
   mockAnswersMeta=[];
   mockRevealAnswer=false;
+  mockTranscripts={};
+  mockConfidences={};
+  stopLiveTranscription();
   const runner=document.getElementById('mockRunner');
   runner.classList.remove('hidden');
   hideMockResults();
@@ -787,6 +795,7 @@ function finishMock(){
 function stopMock(){
   clearInterval(mockTimerInterval); mockTimerInterval=null;
   stopSpeak();
+  stopLiveTranscription();
   if(mediaRecorder && mediaRecorder.state==='recording') try{ mediaRecorder.stop(); }catch(e){}
   try{ if(mediaRecorder && mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(tr=>tr.stop()); }catch(e){}
   const runner=document.getElementById('mockRunner');
@@ -797,6 +806,76 @@ function stopMock(){
 function getMockSavedForCurrent(){
   return mockSessionSaves.filter(s=> s.qIdx===mockIndex);
 }
+
+/* ============ SPEECH-TO-TEXT (Web Speech API) ============ */
+function speechRecAvailable(){
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+function stopLiveTranscription(){
+  if(recognition){
+    try{ recognition.onresult = null; recognition.onerror = null; recognition.onend = null; recognition.abort(); }catch(e){}
+    recognition = null;
+  }
+}
+function startLiveTranscription(){
+  if(!speechRecAvailable()){ updateSttStatus('off'); return false; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  try{
+    stopLiveTranscription();
+    recognition = new SR();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    const qIdx = mockIndex;
+    let finalText = '';
+    if(!mockTranscripts[qIdx]) mockTranscripts[qIdx] = '';
+    if(!mockConfidences[qIdx]) mockConfidences[qIdx] = { sum: 0, count: 0 };
+    recognition.onresult = (event) => {
+      let interim = '';
+      for(let i = event.resultIndex; i < event.results.length; i++){
+        const res = event.results[i];
+        if(res.isFinal){
+          finalText += res[0].transcript + ' ';
+          if(typeof res[0].confidence === 'number'){
+            mockConfidences[qIdx].sum += res[0].confidence;
+            mockConfidences[qIdx].count++;
+          }
+        } else {
+          interim += res[0].transcript;
+        }
+      }
+      mockTranscripts[qIdx] = (finalText + ' ' + interim).replace(/\s+/g, ' ').trim();
+      updateSttStatus('live');
+      updateLiveTranscriptUI();
+    };
+    recognition.onerror = (e) => {
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed') updateSttStatus('off');
+      else if(e.error === 'no-speech'){ /* kutishda davom etadi */ }
+    };
+    recognition.onend = () => { updateSttStatus(mockTranscripts[mockIndex] ? 'done' : 'idle'); };
+    recognition.start();
+    updateSttStatus('live');
+    return true;
+  }catch(e){ updateSttStatus('off'); return false; }
+}
+function updateSttStatus(state){
+  const el = document.getElementById('sttStatus');
+  if(!el) return;
+  const map = {
+    live:  { t: '● Tinglanmoqda', c: 'text-emerald-600 dark:text-emerald-400' },
+    done:  { t: '✓ Matn olindi',  c: 'text-emerald-600 dark:text-emerald-400' },
+    idle:  { t: '',               c: '' },
+    off:   { t: 'Chrome/Edge da ishlaydi', c: 'text-slate-400' }
+  };
+  const s = map[state] || map.idle;
+  el.textContent = s.t; el.className = 'text-[10px] font-bold ' + s.c;
+}
+function updateLiveTranscriptUI(){
+  const el = document.getElementById('liveTranscript');
+  if(!el) return;
+  const text = mockTranscripts[mockIndex] || '';
+  el.textContent = text || 'Gapirganingizda shu yerda matn ko\u2018rinadi (Chrome/Edge).';
+}
 async function toggleRecording(){
   const btn=document.getElementById('recBtn');
   const status=document.getElementById('recStatus');
@@ -804,6 +883,7 @@ async function toggleRecording(){
   const time=document.getElementById('recTime');
   const playback=document.getElementById('playback');
   if(mediaRecorder && mediaRecorder.state==='recording'){
+    stopLiveTranscription();
     mediaRecorder.stop();
     status.textContent='Saqlanmoqda...';
     btn.classList.remove('animate-pulse');
@@ -837,6 +917,7 @@ async function toggleRecording(){
     };
     mediaRecorder.start();
     recStart=Date.now();
+    startLiveTranscription();
     status.textContent='Yozilmoqda...';
     status.className='text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-500 text-white animate-pulse';
     btn.classList.add('animate-pulse');
@@ -1287,6 +1368,10 @@ async function analyzeMockSession(){
     a.qIdx = r.qIdx;
     a.part = item ? item.part : 'Part 1';
     a.wallSec = r.duration || 0;
+    a.transcript = mockTranscripts[r.qIdx] || '';
+    const c = mockConfidences[r.qIdx];
+    a.asrConfidence = (c && c.count) ? (c.sum / c.count) : null;
+    a.tr = analyzeTranscript(a.transcript, item ? item.vocab : null);
     if(!a.ok){
       // audio decode ishlamasa — yozuv davomiyligiga qarab konservativ baho
       a.estimated = true;
@@ -1320,6 +1405,47 @@ function clampBand(raw, comp){
   return b;
 }
 
+/* ============ MATN TAHLILI (speech-to-text natijasidan) ============ */
+const FILLERS = ['um','uh','erm','hmm','you know','i mean','like','basically','actually','so yeah','well'];
+const CONNECTORS = ['however','moreover','furthermore','although','because','therefore','in addition','for example','for instance','while','whereas','on the other hand','as a result','consequently','besides','despite'];
+
+function analyzeTranscript(text, bestVocab){
+  const t = { wordCount:0, uniqueRatio:0, longWordRatio:0, fillers:0, connectorCount:0, vocabMatch:0 };
+  if(!text) return t;
+  const clean = String(text).toLowerCase().replace(/[^a-z0-9'\s-]/g, ' ');
+  const tokens = clean.split(/\s+/).filter(Boolean);
+  const words = tokens.filter(w => /[a-z]/.test(w));
+  t.wordCount = words.length;
+  if(t.wordCount){
+    const unique = new Set(words);
+    t.uniqueRatio = unique.size / t.wordCount;
+    t.longWordRatio = words.filter(w => w.length >= 7).length / t.wordCount;
+    t.fillers = FILLERS.filter(f => {
+      const pat = f.indexOf(' ') > -1 ? f.replace(/ /g, '\\s+') : '\\b' + f + '\\b';
+      return new RegExp(pat, 'g').test(clean);
+    }).length;
+    t.connectorCount = CONNECTORS.filter(c => new RegExp('\\b' + c + '\\b', 'g').test(clean)).length;
+    if(Array.isArray(bestVocab) && bestVocab.length){
+      t.vocabMatch = bestVocab.filter(v => clean.indexOf(String(v).toLowerCase()) > -1).length;
+    }
+  }
+  return t;
+}
+function lexicalFromTranscript(t){
+  if(!t || !t.wordCount) return 0;
+  const div = Math.min(1, t.uniqueRatio / 0.55);   // 0.55 unikallik ~ to'liq
+  const adv = Math.min(1, t.longWordRatio / 0.15); // uzun/akademik so'zlar
+  const conn = Math.min(1, t.connectorCount / 2);
+  return 0.25 + 0.4 * div + 0.2 * adv + 0.15 * conn;
+}
+function grammarFromTranscript(t){
+  if(!t || !t.wordCount) return 0;
+  const conn = Math.min(1, t.connectorCount / 2);
+  const len = Math.min(1, t.wordCount / 60);
+  const fillPen = Math.min(0.3, t.fillers * 0.05);
+  return Math.max(0.1, 0.3 + 0.4 * conn + 0.3 * len - fillPen);
+}
+
 // Ballar endi faqat o'lchangan signallardan kelib chiqadi (random/bonus yo'q).
 function computeBands(analyses, answered, total){
   const n = analyses.length;
@@ -1327,18 +1453,30 @@ function computeBands(analyses, answered, total){
   const lenAvg = avg(a => lengthScore(a.voicedSec, a.part));
   const contAvg = avg(a => continuityScore(a.speechRatio));
   const levelAvg = avg(a => Math.min(1, a.rms * 6));
+  const lexT = avg(a => lexicalFromTranscript(a.tr));
+  const gramT = avg(a => grammarFromTranscript(a.tr));
   const longPauses = analyses.reduce((s, a) => s + (a.longPauses || 0), 0);
   const maxPause = analyses.reduce((s, a) => Math.max(s, a.maxPause || 0), 0);
+  const fillers = analyses.reduce((s, a) => s + ((a.tr && a.tr.fillers) || 0), 0);
+  const wordCount = analyses.reduce((s, a) => s + ((a.tr && a.tr.wordCount) || 0), 0);
+  const hasTranscript = analyses.some(a => a.tr && a.tr.wordCount);
+  const asrConf = avg(a => a.asrConfidence != null ? a.asrConfidence : 0);
+  const hasAsr = analyses.some(a => a.asrConfidence != null);
+  // ASR ishonchi odatda 0.6–0.95 oralig'ida — uni 0..1 "tiniqlik"ga keltiramiz
+  const asrClarity = Math.max(0, Math.min(1, (asrConf - 0.55) / 0.35));
   const ratio = total ? (answered / total) : 0;
   const comp = 0.35 + 0.65 * ratio;
 
-  const pausePen = Math.min(1.5, longPauses * 0.2 + (maxPause >= 5 ? 0.5 : 0));
-  const flu  = clampBand(2.5 + (contAvg * 0.75 + lenAvg * 0.25) * 6.5 - pausePen, comp);
-  const lex  = clampBand(2.5 + (lenAvg * 0.8 + contAvg * 0.2) * 6.5, comp);
-  const gram = clampBand(2.5 + (lenAvg * 0.5 + contAvg * 0.5) * 6.5, comp);
-  const pron = clampBand(2.5 + (levelAvg * 0.25 + contAvg * 0.5 + lenAvg * 0.25) * 6.5, comp);
+  const pausePen = Math.min(1.5, longPauses * 0.2 + (maxPause >= 5 ? 0.5 : 0) + Math.min(0.4, fillers * 0.05));
+  const flu  = clampBand(2.5 + (contAvg * 0.7 + lenAvg * 0.3) * 6.5 - pausePen, comp);
+  // Lexical: transkript bor bo'lsa — so'z boyligi; yo'q bo'lsa — davomiylik/qat'iylik
+  const lex  = clampBand(2.5 + (hasTranscript ? (lexT * 0.7 + lenAvg * 0.3) : (lenAvg * 0.8 + contAvg * 0.2)) * 6.5, comp);
+  // Grammar: transkript bor bo'lsa — bog'lovchilar + uzunlik; yo'q bo'lsa — umumiy o'lchov
+  const gram = clampBand(2.5 + (hasTranscript ? (gramT * 0.7 + contAvg * 0.3) : (lenAvg * 0.5 + contAvg * 0.5)) * 6.5, comp);
+  // Pronunciation: ASR ishonchi (tiniqlik) bor bo'lsa ishlatiladi, aks holda ovoz sifati
+  const pron = clampBand(2.5 + (hasAsr ? (asrClarity * 0.55 + contAvg * 0.45) : (levelAvg * 0.25 + contAvg * 0.5 + lenAvg * 0.25)) * 6.5, comp);
 
-  return { flu, lex, gram, pron, ratio, longPauses, maxPause, lenAvg, contAvg };
+  return { flu, lex, gram, pron, ratio, longPauses, maxPause, lenAvg, contAvg, hasTranscript, hasAsr, fillers, wordCount };
 }
 
 function buildMockFeedback(b, analyses, answered, total){
@@ -1347,6 +1485,16 @@ function buildMockFeedback(b, analyses, answered, total){
   f.push('Nutq davomiyligi: yozuv vaqtining ~' + Math.round(b.contAvg * 100) + '% qismida haqiqatdan gapirgansiz (pauza emas).');
   if(b.longPauses > 0) f.push(b.longPauses + ' ta uzun pauza aniqlandi \u2014 oqimni saqlash uchun pauzalarni qisqartiring.');
   if(b.maxPause >= 3) f.push('Eng uzun pauza ' + b.maxPause.toFixed(1) + ' soniya.');
+
+  // Speech-to-text natijalari
+  if(b.hasTranscript){
+    f.push('Speech-to-text: jami ~' + b.wordCount + ' so\u2018z aytdingiz, shundan ' + b.fillers + ' ta to\u2018ldiruvchi so\u2018z (um, like, you know).');
+    const connectors = analyses.reduce((s, a) => s + ((a.tr && a.tr.connectorCount) || 0), 0);
+    if(connectors < 3) f.push('Bog\u2018lovchilar juda kam (' + connectors + ' ta) \u2014 however, because, for example kabi so\u2018zlarni qo\u2018shing.');
+    else f.push('Bog\u2018lovchilardan yaxshi foydalangansiz (' + connectors + ' ta).');
+  } else {
+    f.push('Eslatma: matn tahlili uchun Chrome/Edge brauzerida topshiring \u2014 hozir faqat audio o\u2018lchovlar ishlatildi.');
+  }
 
   const weak = analyses.filter(a => a.voicedSec < (PART_TARGETS[a.part] || PART_TARGETS['Part 1']).min);
   if(weak.length){
@@ -1365,7 +1513,7 @@ function buildMockFeedback(b, analyses, answered, total){
   else f.push('Grammar: tuzilma barqaror.');
   if(b.pron < 6) f.push('Pronunciation: aniqroq va balandroq gapiring \u2014 AI ovozini tinglab, talaffuzni takrorlang.');
   else f.push('Pronunciation: ovoz tiniq va barqaror.');
-  f.push('Eslatma: ballar yozuvingizning haqiqiy o\u2018lchovlaridan (gapirish vaqti, pauzalar, ovoz sifati) hisoblanadi \u2014 endi hammaga bir xil 7.5\u20138.0 qo\u2018yilmaydi.');
+  f.push('Eslatma: ballar yozuv + speech-to-text matnidan (gapirish vaqti, pauzalar, so\u2018z boyligi, bog\u2018lovchilar, talaffuz tiniqligi) hisoblanadi \u2014 tasodif yo\u2018q.');
   return f;
 }
 
@@ -1530,6 +1678,7 @@ async function initAccount(){
       if(unsubscribeProgress) unsubscribeProgress();
       accountReady=false; accountUser=user; progress=Object.create(null);
       // Discard session data on identity changes; never attach another user's work.
+      stopLiveTranscription(); mockTranscripts={}; mockConfidences={};
       clearInterval(mockTimerInterval); mockTimerInterval=null;
       clearInterval(dailyInterval); dailyInterval=null; dailyRunning=false; dailyRemaining=1200;
       if(mediaRecorder){ mediaRecorder.onstop=null; try{mediaRecorder.stop();}catch(e){} mediaRecorder.stream?.getTracks().forEach(t=>t.stop()); }

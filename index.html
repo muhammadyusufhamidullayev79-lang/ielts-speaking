@@ -344,7 +344,7 @@ html.dark { color-scheme: dark; }
         <div>
           <div class="inline-flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> SPEAKING MOCK TEST • REAL EXAM SIMULATION</div>
           <h1 class="mt-4 font-serif text-[32px] sm:text-[40px] leading-[0.95]">Haqiqiy imtihon <br><span class="italic font-light">kabi</span> <span class="bg-amber-400 text-slate-900 px-2 rounded-xl">Mock</span></h1>
-          <p class="mt-3 text-[14px] leading-6 text-white/80 max-w-[560px]">Savollar audio tizimda o'qiladi, siz mikrofonda javob berasiz. Har bir javobingiz saqlanadi — keyin tinglab, o'zingizni baholay olasiz. Fluency, Lexical, Grammar bo'yicha avtomatik eslatmalar.</p>
+          <p class="mt-3 text-[14px] leading-6 text-white/80 max-w-[560px]">Savollar audio tizimda o'qiladi, siz mikrofonda javob berasiz. Nutqingiz <b>speech-to-text</b> orqali matnga aylanadi va so'z boyligi, bog'lovchilar, pauzalar hamda ovoz sifati bo'yicha tahlil qilinadi.</p>
           <div class="mt-6 flex flex-wrap gap-3">
             <button onclick="startMock()" class="bg-amber-400 text-slate-900 rounded-full px-7 py-3 font-extrabold text-[14px] inline-flex items-center gap-2">Mock ni boshlash <i data-lucide="mic" class="w-4 h-4"></i></button>
             <button onclick="openSettings()" class="bg-white/10 backdrop-blur border border-white/20 rounded-full px-6 py-3 font-bold text-[14px] inline-flex items-center gap-2"><i data-lucide="settings-2" class="w-4 h-4"></i> Ovozni tanlash</button>
@@ -366,6 +366,7 @@ html.dark { color-scheme: dark; }
             <ol class="text-[12px] leading-5 mt-1 list-decimal list-inside opacity-80">
               <li>Savol avtomatik o'qiladi (AI ovoz)</li>
               <li>“Record” tugmasini bosing, javob bering va “Saqlash” ni bosing</li>
+              <li>Nutqingiz <b>speech-to-text</b> orqali matnga aylantiriladi (Chrome/Edge)</li>
               <li>Best Answer mock davomida yopiq turadi — topshirib bo'lgach ochiladi</li>
               <li>Yakunda <b>Part 1, Part 2, Part 3</b> uchun alohida ro'yxat: sizning audiongiz + Best Answer (Band 8-9)</li>
             </ol>
@@ -439,6 +440,13 @@ html.dark { color-scheme: dark; }
             <button onclick="saveMockAnswer()" class="flex-1 bg-emerald-500 text-white rounded-full py-2.5 text-[13px] font-bold">Saqlash ✓</button>
           </div>
           <audio id="playback" controls class="w-full mt-3 hidden"></audio>
+          <div class="mt-4">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[11px] font-extrabold tracking-widest text-slate-500">SPEECH-TO-TEXT</span>
+              <span id="sttStatus" class="text-[10px] font-bold text-slate-400"></span>
+            </div>
+            <div id="liveTranscript" class="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-[12px] leading-5 min-h-[48px] max-h-[120px] overflow-auto text-slate-600 dark:text-slate-300">Gapirganingizda shu yerda matn ko'rinadi (Chrome/Edge).</div>
+          </div>
           <div id="mockSavedList" class="mt-4 space-y-2 max-h-[160px] overflow-auto"></div>
           <p class="mt-3 text-[11px] leading-4 text-slate-500">Audio yozuvlar shu sessiyada (brauzer xotirasida) turadi — sahifa yangilansa o‘chib ketadi. Javoblar soni va tarix esa saqlanadi.</p>
         </div>
@@ -454,9 +462,9 @@ html.dark { color-scheme: dark; }
         <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
         <div class="relative flex items-start justify-between gap-4">
           <div>
-            <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide">✓ TEKSHIRILDI • AUDIO TAHLILI</div>
+            <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-full px-3 py-1 text-[11px] font-extrabold tracking-wide">✓ TEKSHIRILDI • AUDIO + MATN TAHLILI</div>
             <h3 class="mt-3 font-extrabold text-[22px] leading-none">Mock Natijasi</h3>
-            <p class="text-[13px] opacity-90 mt-1">Javoblaringizning audio yozuvi tahlil qilindi (gapirish vaqti, pauzalar, ovoz sifati) — quyida har bir mezon bo'yicha baho va tavsiyalar</p>
+            <p class="text-[13px] opacity-90 mt-1">Nutqingiz matnga aylantirilib (speech-to-text) va audio yozuvingiz (gapirish vaqti, pauzalar, ovoz) tahlil qilindi — quyida har bir mezon bo'yicha baho va tavsiyalar</p>
           </div>
           <button onclick="closeMockResults()" class="hidden sm:grid w-9 h-9 rounded-full bg-white/20 place-items-center">✕</button>
         </div>
@@ -494,7 +502,7 @@ html.dark { color-scheme: dark; }
           </div>
         </div>
         <div>
-          <div class="text-[11px] font-extrabold tracking-widest text-slate-500">AUDIO TAHLILI & TAVSIYALAR</div>
+          <div class="text-[11px] font-extrabold tracking-widest text-slate-500">TAHLIL & TAVSIYALAR</div>
           <div id="resFeedback" class="mt-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4 space-y-2"></div>
           <div class="mt-4 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 text-[12px] leading-5">
             <b>Keyingi qadam:</b> Kamroq bo'lgan mezonga e'tibor berib, shu mavzularni qayta mashq qiling. Har kuni 20' Daily ni o'tkazib yubormang!
