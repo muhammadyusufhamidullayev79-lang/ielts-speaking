@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="IELTS Speaking">
+  <defs>
+    <linearGradient id="bubbleGrad" x1="0" y1="-1" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#2C9BFF"/>
+      <stop offset="1" stop-color="#0A6BD6"/>
+    </linearGradient>
+    <radialGradient id="bgGrad" cx="0.5" cy="0.42" r="0.75">
+      <stop offset="0" stop-color="#0E1A2C"/>
+      <stop offset="1" stop-color="#060B14"/>
+    </radialGradient>
+  </defs>
+  <circle cx="512" cy="512" r="512" fill="url(#bgGrad)"/>
+  
+  <g transform="translate(512 532.48) scale(2.05)">
+    <!-- suhbat pufagi: ochiq halqa -->
+    <path d="M -81.3 104.0 A 132 132 0 1 0 -122.4 49.4"
+          fill="none" stroke="url(#bubbleGrad)" stroke-width="27" stroke-linecap="round"/>
+    <!-- pufak dumchasi -->
+    <path d="M -72.3 107.2 L -155.4 104.8 L -123.0 40.0 Z"
+          fill="url(#bubbleGrad)" stroke="url(#bubbleGrad)" stroke-width="16" stroke-linejoin="round"/>
+
+    <!-- mikrofon korpusi -->
+    <rect x="-41" y="-104" width="82" height="146" rx="41" fill="#FFFFFF"/>
+    <!-- korpusdagi chiziqlar -->
+    <g stroke="#060B14" stroke-width="10" stroke-linecap="round" opacity=".9">
+      <line x1="-23" y1="-70" x2="23" y2="-70"/>
+      <line x1="-23" y1="-42" x2="23" y2="-42"/>
+      <line x1="-23" y1="-14" x2="23" y2="-14"/>
+    </g>
+    <!-- ushlagich yoy -->
+    <path d="M -76 4 A 76 76 0 0 0 76 4" fill="none" stroke="#FFFFFF"
+          stroke-width="19" stroke-linecap="round"/>
+    <!-- oyoq va asos -->
+    <line x1="0" y1="72" x2="0" y2="112" stroke="#FFFFFF" stroke-width="19" stroke-linecap="round"/>
+    <line x1="-46" y1="122" x2="46" y2="122" stroke="#FFFFFF" stroke-width="19" stroke-linecap="round"/>
+  </g>
+</svg>

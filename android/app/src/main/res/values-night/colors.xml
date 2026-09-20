@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- To'q rejimda oyna foni sayt foni bilan mos bo'lsin -->
+    <color name="windowBackground">#060B14</color>
+</resources>

@@ -1,0 +1,36 @@
+{
+  "appId": "uz.eagle9.ieltsspeaking",
+  "appName": "IELTS Speaking Pro",
+  "webDir": "www",
+  "backgroundColor": "#EFF6FFFF",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#EFF6FFFF"
+  },
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#EFF6FFFF",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#060B14",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#060B14",
+      "overlaysWebView": false
+    }
+  }
+}
