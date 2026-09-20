@@ -96,14 +96,6 @@ def main() -> int:
         html,
         flags=re.DOTALL,
     )
-    # Oflayn chizig'i: pwa.js bo'lmagani uchun hech qachon ko'rsatilmaydi
-    html = re.sub(
-        r'\s*<!-- OFLAYN HOLAT CHIZIG\'I -->\s*<div id="offlineBar".*?</div>',
-        "",
-        html,
-        flags=re.DOTALL,
-    )
-
     # --- 4) Rasmlarni data URL ga aylantirish -----------------------------
     for rel in sorted(set(re.findall(r'(?:src|href)="(assets/(?:icons|avatars)/[^"]+)"', html))):
         path = ROOT / rel

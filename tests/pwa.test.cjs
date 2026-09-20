@@ -160,7 +160,7 @@ test('oflayn holatda Mock bloklanadi, mavzular esa ochiq qoladi', () => {
   window.startMock();
   assert.equal(calls.mock, 0, 'oflaynda Mock boshlanmasligi kerak');
 
-  assert.equal(window.document.getElementById('offlineBar').hidden, false, 'oflayn chizig\u2019i ko\u2019rinishi kerak');
+  assert.equal(window.document.getElementById('offlineBar'), null, 'oflayn chizig\u2019i olib tashlangan');
 
   const mockBtn = window.document.querySelector('[data-needs-online]');
   assert.equal(mockBtn.disabled, true, 'Mock tugmasi o\u2019chirilishi kerak');
@@ -185,7 +185,7 @@ test('internet qaytganda Mock qayta ochiladi', () => {
   window.startMock();
   assert.equal(calls.mock, 1, 'ulanish tiklangach Mock ishlashi kerak');
   assert.equal(clickMock().reached, true, 'onlaynda bosish o\u2019tishi kerak');
-  assert.equal(window.document.getElementById('offlineBar').hidden, true);
+  assert.equal(window.document.getElementById('offlineBar'), null);
   assert.equal(window.document.querySelector('[data-needs-online]').disabled, false);
 });
 
