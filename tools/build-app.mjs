@@ -26,7 +26,11 @@ const INCLUDE = [
 
 /* Native ilovada keraksiz (yoki zararli) fayllar */
 const EXCLUDE = new Set([
-  'assets/logo.png',            // 1 MB original — ilovada icons/logo-128.png ishlatiladi
+  'assets/logo.png',            // faqat ulashish uchun — ilovada icons/ dagilar ishlatiladi
+  'assets/logo.svg',            // logo manbasi (tools/make-logo.mjs) — ilovaga kerak emas
+  'assets/logo-flat.svg',
+  'assets/logo-mark.svg',
+  'assets/logo-mark-flat.svg',
   'js/admin.js',                // admin paneli faqat veb uchun
 ]);
 

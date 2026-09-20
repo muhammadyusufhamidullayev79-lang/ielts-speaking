@@ -38,10 +38,10 @@ html.pwa-native input,html.pwa-native textarea,html.pwa-native [contenteditable]
 .pwa-toast-close:hover{color:#fff}
 
 /* "Ilovani o'rnatish" tugmasi */
-.pwa-install-btn{display:inline-flex;align-items:center;gap:7px;background:#2E0E4E;color:#fff;border:0;
+.pwa-install-btn{display:inline-flex;align-items:center;gap:7px;background:#0A4FA8;color:#fff;border:0;
   border-radius:999px;padding:9px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap}
 .pwa-install-btn:hover{background:#42156e}
-.dark .pwa-install-btn{background:#fff;color:#2E0E4E}
+.dark .pwa-install-btn{background:#fff;color:#0A4FA8}
 .dark .pwa-install-btn:hover{background:#ede9fe}
 .pwa-install-btn-ghost{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(8px)}
 .pwa-install-btn-ghost:hover{background:rgba(255,255,255,.2)}

@@ -13,8 +13,8 @@
 
 <!-- PWA / ilova -->
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#2E0E4E" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0F0A1E" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0A4FA8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#060B14" media="(prefers-color-scheme: dark)">
 <meta name="application-name" content="IELTS Speaking Pro">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -59,8 +59,8 @@ html.dark { color-scheme: dark; }
 .account-field input:focus{outline:2px solid #94a3b8;outline-offset:2px;border-color:transparent}
 .account-profile{display:flex;align-items:center;gap:16px;margin:6px 0 16px}
 .account-avatar{position:relative;width:76px;height:76px;flex:none}
-.account-avatar-img{width:76px;height:76px;border-radius:50%;object-fit:cover;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 8px 20px -6px rgba(99,102,241,.5)}
-.account-avatar-initial{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;font-size:28px;font-weight:800;color:#fff;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 8px 20px -6px rgba(99,102,241,.5)}
+.account-avatar-img{width:76px;height:76px;border-radius:50%;object-fit:cover;background:linear-gradient(135deg,#3B82F6,#0A4FA8);box-shadow:0 8px 20px -6px rgba(37,99,235,.45)}
+.account-avatar-initial{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;font-size:28px;font-weight:800;color:#fff;background:linear-gradient(135deg,#3B82F6,#0A4FA8);box-shadow:0 8px 20px -6px rgba(37,99,235,.45)}
 .account-avatar-edit{position:absolute;right:-2px;bottom:-2px;width:26px;height:26px;border-radius:50%;background:#0F172A;color:#fff;display:grid;place-items:center;border:2px solid #fff;cursor:pointer;font-size:13px;line-height:1}.dark .account-avatar-edit{background:#fff;color:#0F172A;border-color:#111A33}
 .account-avatar-edit:hover{transform:scale(1.06)}
 .account-profile-meta{min-width:0;flex:1}
@@ -98,24 +98,24 @@ html.dark { color-scheme: dark; }
 <script src="vendor/lucide.min.js" defer></script>
 <script src="js/pwa.js" defer></script>
 </head>
-<body class="bg-[#F5F0FF] dark:bg-[#0F0A1E] text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-amber-200">
+<body class="bg-[#EFF6FF] dark:bg-[#060B14] text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-amber-200">
 <!-- OFLAYN HOLAT CHIZIG'I -->
 <div id="offlineBar" class="offline-bar" role="status" aria-live="polite" hidden>
   <span class="offline-dot"></span>
   <span>Internet yo‘q — <b>mavzular va Best Answer’lar</b> ishlayapti. Mock va bulutga saqlash ulanish tiklangach.</span>
 </div>
 <!-- TOP NAV -->
-<header class="sticky top-0 z-40 bg-white/80 dark:bg-[#0F0A1E]/80 glass border-b border-slate-200 dark:border-white/10">
+<header class="sticky top-0 z-40 bg-white/80 dark:bg-[#060B14]/80 glass border-b border-slate-200 dark:border-white/10">
   <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
     <div class="h-[64px] flex items-center justify-between gap-4">
       <div class="flex items-center gap-6">
         <a href="#" class="flex items-center gap-3" onclick="router('home');return false">
           <img src="assets/icons/logo-128.png" alt="IELTS Eagle 9 Logo" width="40" height="40" class="w-10 h-10 rounded-full object-cover shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
           <div class="leading-none">
-            <div class="font-extrabold tracking-tight text-[15px] flex items-center gap-1.5">IELTS SPEAKING <span class="hidden sm:inline text-[10px] bg-[#2E0E4E] text-white px-1.5 py-0.5 rounded-full tracking-widest">EAGLE 9</span></div>
+            <div class="font-extrabold tracking-tight text-[15px] flex items-center gap-1.5">IELTS SPEAKING <span class="hidden sm:inline text-[10px] bg-[#0A4FA8] text-white px-1.5 py-0.5 rounded-full tracking-widest">EAGLE 9</span></div>
             <div class="text-[10px] tracking-[0.18em] font-bold text-slate-500 dark:text-slate-400 -mt-0.5">PRO • UZBEKISTAN</div>
           </div>
-          <span class="hidden sm:inline-flex ml-2 px-2.5 py-1 rounded-full bg-[#2E0E4E] text-white text-[11px] font-extrabold tracking-wide">NEW 2026</span>
+          <span class="hidden sm:inline-flex ml-2 px-2.5 py-1 rounded-full bg-[#0A4FA8] text-white text-[11px] font-extrabold tracking-wide">NEW 2026</span>
         </a>
         <nav class="hidden lg:flex items-center gap-1 ml-2">
           <button onclick="router('part1')" data-nav="part1" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">Part 1 <span id="navCountP1" class="ml-1 text-[11px] bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-1.5 py-0.5 rounded-full">38</span></button>
@@ -174,7 +174,7 @@ html.dark { color-scheme: dark; }
 
 <!-- HERO -->
 <section id="view-home" class="view">
-  <div class="hero-grid border-b border-slate-200 dark:border-white/10 bg-gradient-to-b from-[#F5F0FF] via-[#EDE9FF] to-[#F5F3FF] dark:from-[#1A1040] dark:via-[#0F0A1E] dark:to-[#0F0A1E]">
+  <div class="hero-grid border-b border-slate-200 dark:border-white/10 bg-gradient-to-b from-[#EFF6FF] via-[#E0EDFF] to-[#F2F8FF] dark:from-[#0D1A2E] dark:via-[#060B14] dark:to-[#060B14]">
     <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       <div class="grid lg:grid-cols-[1.15fr_.85fr] gap-8 items-start">
         <div>
@@ -192,7 +192,7 @@ html.dark { color-scheme: dark; }
           <div class="mt-6 flex flex-wrap gap-3">
             <button onclick="router('part1')" class="bg-emerald-500 hover:bg-emerald-600 text-white rounded-full px-6 py-3 text-[14px] font-bold inline-flex items-center gap-2 shadow-soft dark:bg-emerald-500 dark:text-white">Mavzularni boshlash <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
             <button onclick="router('mock')" class="bg-sky-500 hover:bg-sky-600 text-white border border-sky-500 rounded-full px-6 py-3 text-[14px] font-bold inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> Mock ni sinab ko'rish</button>
-            <button onclick="router('daily')" class="bg-[#2E0E4E] hover:bg-[#1A0A2E] text-white rounded-full px-6 py-3 text-[14px] font-extrabold inline-flex items-center gap-2">20' Daily Dars →</button>
+            <button onclick="router('daily')" class="bg-[#0A4FA8] hover:bg-[#073C82] text-white rounded-full px-6 py-3 text-[14px] font-extrabold inline-flex items-center gap-2">20' Daily Dars →</button>
           </div>
           <div class="mt-6 flex flex-wrap items-center gap-3 text-[12px] font-semibold">
             <span class="inline-flex items-center gap-2 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5"><span class="w-6 h-6 rounded-full bg-emerald-500 text-white grid place-items-center"><i data-lucide="check" class="w-3.5 h-3.5"></i></span> <span id="heroBestCount">400</span> × Best Answer</span>
@@ -679,7 +679,7 @@ html.dark { color-scheme: dark; }
 <!-- TOPIC MODAL -->
 <div id="topicModal" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeTopic()"></div>
-  <div class="absolute inset-0 sm:inset-4 lg:inset-8 bg-[#F5F0FF] dark:bg-[#0F0A1E] rounded-t-[20px] sm:rounded-[24px] shadow-2xl overflow-hidden flex flex-col">
+  <div class="absolute inset-0 sm:inset-4 lg:inset-8 bg-[#EFF6FF] dark:bg-[#060B14] rounded-t-[20px] sm:rounded-[24px] shadow-2xl overflow-hidden flex flex-col">
     <div class="shrink-0 bg-white dark:bg-[#111A33] border-b border-slate-200 dark:border-white/10 px-4 sm:px-6 py-4 flex items-center gap-4">
       <div id="modalIcon" class="w-11 h-11 rounded-xl bg-slate-900 text-white grid place-items-center text-xl">💬</div>
       <div class="flex-1 min-w-0">
@@ -796,12 +796,12 @@ html.dark { color-scheme: dark; }
   </div>
 </div>
 
-<footer class="border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#0F0A1E] mt-10">
+<footer class="border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#060B14] mt-10">
   <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500">
       <div class="flex items-center gap-3">
         <img src="assets/icons/logo-128.png" alt="logo" width="32" height="32" class="w-8 h-8 rounded-full object-cover">
-        <span>© 2026 IELTS Speaking Pro — <b class="text-[#2E0E4E] dark:text-white">Eagle 9</b> • Barcha mavzular IELTS 2026 formatiga mos. Made for Uzbekistan 🇺🇿 <span class="ml-1 font-mono text-[11px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full">build v2.1</span></span>
+        <span>© 2026 IELTS Speaking Pro — <b class="text-[#0A4FA8] dark:text-white">Eagle 9</b> • Barcha mavzular IELTS 2026 formatiga mos. Made for Uzbekistan 🇺🇿 <span class="ml-1 font-mono text-[11px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full">build v2.1</span></span>
       </div>
       <div class="flex gap-4"><a href="#" class="hover:underline" rel="noopener">Maxfiylik</a><a href="#" class="hover:underline" rel="noopener">Yordam</a><a href="#" class="hover:underline" rel="noopener">Aloqa</a><a href="admin.html" class="hover:underline font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-2.5 py-1 rounded-full text-[11px]">Admin</a></div>
     </div>

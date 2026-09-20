@@ -238,7 +238,7 @@
     const P = (C && C.Plugins) || {};
     try {
       if (P.StatusBar && P.StatusBar.setBackgroundColor) {
-        await P.StatusBar.setBackgroundColor({ color: '#2E0E4E' });
+        await P.StatusBar.setBackgroundColor({ color: '#060B14' });
         if (P.StatusBar.setStyle) await P.StatusBar.setStyle({ style: 'DARK' });
       }
     } catch (e) { /* ignore */ }

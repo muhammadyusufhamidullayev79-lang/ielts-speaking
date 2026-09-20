@@ -35,6 +35,8 @@ mavzular esa odatdagidek ochilaveradi.
 | `css/app.css` | Build natijasi — **qo'lda tahrirlamang** (`tools/build-css.sh` yaratadi) |
 | `css/account.css`, `css/pwa.css` | Qo'lda yoziladigan stillar (build vaqtida app.css ga qo'shiladi) |
 | `vendor/`, `assets/fonts/` | Lucide ikonkalari va shriftlar — oflayn uchun loyiha ichida |
+| `assets/logo.svg` | Brend logosi — vektor manba (`tools/make-logo.mjs` yaratadi) |
+| `assets/logo-mark.svg` | Faqat mikrofon belgisi (kichik o'lchamlar uchun) |
 | `assets/icons/` | PWA / Android / iOS ikonkalari (`tools/build-icons.mjs` yaratadi) |
 | `standalone.html` | Hammasi bitta faylda — ulashish uchun (`tools/build-standalone.py`) |
 | `admin.html`, `js/admin.js` | Admin panel (mavzu qo'shish/tahrirlash, import/export) |
@@ -47,9 +49,23 @@ mavzular esa odatdagidek ochilaveradi.
 npm install          # bir marta
 
 npm run build:css    # css/app.css (Tailwind + account.css + pwa.css)
+npm run build:logo   # assets/logo.svg — brend logosi
 npm run build:icons  # assets/icons/ — logodan PWA ikonkalari
 npm run test         # testlar
 npm run serve        # http://localhost:8000
+```
+
+### Logoni o'zgartirish
+
+Logo `tools/make-logo.mjs` ichida kod bilan chiziladi (matn vektor yo'llarga
+aylantiriladi, shrift o'rnatilgan bo'lishi shart emas). Rang yoki shaklni
+o'zgartirgach, quyidagilarni ketma-ket ishga tushiring:
+
+```bash
+npm run build:logo            # assets/logo.svg + logo-mark.svg
+npm run build:icons           # PWA ikonkalari
+npm run build:native-assets   # Android/iOS ikonka va splash ekranlari
+npm run build:standalone      # standalone.html
 ```
 
 `index.html`, `js/*.js` yoki CSS'ni o'zgartirsangiz `npm run build:css` ni ishlating —
@@ -69,7 +85,7 @@ Native loyihalar Capacitor bilan yig'ilgan. Veb kodi `www/` ga ko'chiriladi
 ```bash
 npm run build:app                      # www/ ni tayyorlaydi
 npx cap sync                           # www/ ni android/ va ios/ ga ko'chiradi
-node tools/build-native-assets.mjs     # ikonka va splash ekranlar
+npm run build:native-assets            # ikonka va splash ekranlar
 
 npm run android                        # Android Studio'da ochadi
 npm run ios                            # Xcode'da ochadi (Mac kerak)
