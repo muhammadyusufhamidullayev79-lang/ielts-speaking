@@ -126,6 +126,7 @@ let dailyRemaining = 20*60;
 let dailyRunning = false;
 let dailyNum = parseInt(safeGet('dailyNum','1'));
 let streak = parseInt(safeGet('streak','1'));
+let dailyTopicsCache = { p1:null, p2:null, p3:null };
 
 document.addEventListener('DOMContentLoaded', ()=>{
   initTheme();
@@ -158,7 +159,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('heroVoiceName').textContent = voicePref==='female' ? 'Dilnoza • Qiz bola' : 'Jasur • O‘g‘il bola';
   document.getElementById('mockVoiceLabel').textContent = voicePref==='female' ? 'Dilnoza • Qiz bola' : 'Jasur • O‘g‘il bola';
   // load voices
-  speechSynthesis.onvoiceschanged = ()=> {/* preload */};
+  // XATO Tuzatish: ayrim brauzerlar (masalan, ichki WebView) speechSynthesis'ni umuman yo'q —
+  // guardsiz xato butun ishga tushirishni buzardi.
+  if(speechSynthesisOK()) speechSynthesis.onvoiceschanged = ()=> {/* preload */};
 });
 
 function refreshIcons(){ if(window.lucide && window.lucide.createIcons) try{window.lucide.createIcons()}catch(e){} }
@@ -200,7 +203,11 @@ function previewVoice(v){
 }
 function switchModalVoice(v){ setVoice(v); if(currentModalTopic) playQuestionAudio(0,true); }
 
+function speechSynthesisOK(){
+  return typeof window.speechSynthesis!=='undefined' && typeof window.SpeechSynthesisUtterance!=='undefined';
+}
 function getVoiceForPref(pref){
+  if(!speechSynthesisOK()) return null;
   const voices = speechSynthesis.getVoices();
   if(!voices.length) return null;
   if(pref==='female'){
@@ -218,6 +225,13 @@ function speak(text, pref, onend, maxLen){
   // SECURITY: sanitize speak text (strip tags, limit length)
   text = sanitizeText(text, maxLen || 600);
   if(!text) return null;
+  // XATO Tuzatish: ovoz sintezi yo'q brauzerlarda (eski WebView) jimgina chiqamiz,
+  // sahifa esa ishlashda davom etadi.
+  if(!speechSynthesisOK()){
+    if(window.pwaToast) window.pwaToast('Brauzeringiz ovoz bilan o‘qishni qo‘llab-quvvatlamaydi. Chrome, Edge yoki Safari’da ochib ko‘ring.', { duration: 6000 });
+    if(typeof onend==='function'){ try{ onend(); }catch(e){} }
+    return null;
+  }
   // PERFORMANCE: throttle speak — 400ms anti-spam
   const now=Date.now(); if(now - _lastSpeakAt < 400) speechSynthesis.cancel();
   _lastSpeakAt=now;
@@ -235,7 +249,7 @@ function speak(text, pref, onend, maxLen){
   try{ speechSynthesis.speak(utter); }catch(e){}
   return utter;
 }
-function stopSpeak(){ speechSynthesis.cancel(); }
+function stopSpeak(){ try{ if(speechSynthesisOK()) speechSynthesis.cancel(); }catch(e){} }
 
 // ROUTER
 function router(view){
@@ -429,8 +443,8 @@ function openTopic(id){
             ${t.prompts.map(p=>`<li class="flex gap-2 text-[13px]"><span class="text-amber-600">•</span><span>${escapeHTML(p)}</span></li>`).join('')}
             <li class="flex gap-2 text-[13px] font-semibold"><span class="text-amber-600">•</span><span>and explain why it is important / memorable to you.</span></li>
           </ul>
-          <div class="mt-3 flex gap-2">
-            <button onclick="speak(\`${escapeHTML(t.title)}. ${t.prompts.join('. ')}\`, voicePref)" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-2 text-[13px] font-bold inline-flex items-center gap-2"><i data-lucide="volume-2" class="w-4 h-4"></i> Cue cardni eshitish</button>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button onclick="playModalCueCard()" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-2 text-[13px] font-bold inline-flex items-center gap-2"><i data-lucide="volume-2" class="w-4 h-4"></i> Cue cardni eshitish</button>
             <span class="text-[11px] self-center text-slate-500">1 min tayyorgarlik • 2 min gapirish</span>
           </div>
         </div>
@@ -441,9 +455,9 @@ function openTopic(id){
             ${t.vocab.map(v=>`<span class="text-[11px] bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2 py-1 rounded-full">${escapeHTML(v)}</span>`).join('')}
           </div>
           <div class="mt-3 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 text-[12px] leading-5"><b>Tip:</b> ${escapeHTML(t.tip)}</div>
-          <div class="mt-4 flex gap-2">
-            <button onclick="startRecordingForTopic()" class="flex-1 bg-red-500 text-white rounded-full py-2.5 text-[13px] font-bold inline-flex items-center justify-center gap-2"><i data-lucide="mic" class="w-4 h-4"></i> Javobni yozib olish</button>
-            <button onclick="speak(\`${t.answer.replace(/`/g,'').slice(0,300)}\`, voicePref)" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-2.5 text-[13px] font-bold">Javobni eshitish</button>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button onclick="startRecordingForTopic()" class="flex-1 min-w-[180px] bg-red-500 text-white rounded-full py-2.5 text-[13px] font-bold inline-flex items-center justify-center gap-2"><i data-lucide="mic" class="w-4 h-4"></i> Javobni yozib olish</button>
+            <button onclick="playModalBestAnswer()" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-4 py-2.5 text-[13px] font-bold">Javobni eshitish</button>
           </div>
           <div id="modalRecArea" class="hidden mt-3 bg-white dark:bg-[#0B1020] border border-slate-200 dark:border-white/10 rounded-2xl p-3">
             <div class="flex items-center justify-between"><span class="text-[12px] font-bold">Yozuv</span><span id="modalRecTime" class="font-mono text-[12px]">00:00</span></div>
@@ -484,7 +498,7 @@ function openTopic(id){
   refreshIcons();
   if(autoPlay){
     setTimeout(()=> {
-      if(t.id.startsWith('p2')) speak(`${escapeHTML(t.title)}. ${t.prompts.join('. ')}`, voicePref);
+      if(t.id.startsWith('p2')) playModalCueCard();
       else playQuestionAudio(0);
     }, 400);
   }
@@ -675,10 +689,11 @@ function startMockTimer(){
   },1000);
 }
 // === MOCK PART META (har bir bo'lim uchun alohida rang/nom) ===
+// RANG Tuzatish: Part 3 butun sayt bo'ylab amber (sariq) rangda — bu yerda ham shunga keltiramiz.
 function mockPartStyle(part){
   if(part==='Part 1') return {badge:'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/20'};
   if(part==='Part 2') return {badge:'bg-amber-400 text-slate-900 border border-amber-400'};
-  return {badge:'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20'};
+  return {badge:'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/20'};
 }
 function fmtDur(sec){
   sec=Math.max(0, Math.floor(sec||0));
@@ -1028,6 +1043,27 @@ function syncCounts(){
   ['', '2'].forEach(sfx=>{ set('p1HeaderCount'+sfx, p1); set('p2HeaderCount'+sfx, p2); set('p3HeaderCount'+sfx, p3); });
 }
 
+// DAILY: "Eshitish" tugmalari uchun xavfsiz o'yinchi — savol matni onclick'ga
+// joylanmaydi, shuning uchun apostrof ('don't', 'it's') bo'lsa ham xato chiqmaydi.
+function playDailyAudio(part, qIdx){
+  const t = dailyTopicsCache[part];
+  if(!t) return;
+  if(part==='p2'){ speak(`${t.title}. ${(t.prompts||[]).join('. ')}`, voicePref); return; }
+  const q = t.questions[qIdx] || t.questions[0];
+  if(q) speak(q.q, voicePref);
+}
+// MODAL (Part 2 cue card): matnni JS ichida olamiz — atribut orqali emas.
+function playModalCueCard(){
+  const t = currentModalTopic;
+  if(!t) return;
+  speak(`${t.title}. ${(t.prompts||[]).join('. ')}`, voicePref);
+}
+function playModalBestAnswer(){
+  const t = currentModalTopic;
+  if(!t) return;
+  speak(t.answer||'', voicePref, null, 600);
+}
+
 // HERO audio demo — vaqt va progress haqiqiy holatga qarab (qotib qolgan "0:24 / 1:08" o'rniga)
 let heroAudioTimer=null;
 let heroAudioPlaying=false;
@@ -1113,43 +1149,46 @@ function renderDaily(){
   const p1 = DATA.part1[(dailyNum*7) % DATA.part1.length];
   const p2 = DATA.part2[(dailyNum*13) % DATA.part2.length];
   const p3 = DATA.part3[(dailyNum*5) % DATA.part3.length];
+  // XAVFSIZLIK: savol matnini onclick atributiga yozmaymiz (apostrof bo'lsa JS sintaksisi
+  // buzilardi va "Eshitish" tugmasi ishlamay qolardi). O'rniga indeks orqali olamiz.
+  dailyTopicsCache = {p1, p2, p3};
   document.getElementById('todayTopicName').textContent = `${p1.title} + ${p2.title.slice(0,32)}... + ${p3.title}`;
   const lessonEl=document.getElementById('dailyLesson');
   lessonEl.innerHTML = `
     <div class="rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
-      <div class="bg-sky-50 dark:bg-sky-500/10 px-4 py-2 flex items-center justify-between">
+      <div class="bg-sky-50 dark:bg-sky-500/10 px-4 py-2 flex items-center justify-between gap-2">
         <span class="text-[11px] font-extrabold tracking-wide text-sky-700 dark:text-sky-300">PART 1 • 6 min</span>
-        <button onclick="speak('${p1.questions[0].q}', voicePref)" class="bg-white dark:bg-white/10 border border-sky-200 dark:border-white/10 rounded-full px-3 py-1 text-[11px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Eshitish</button>
+        <button onclick="playDailyAudio('p1',0)" class="bg-white dark:bg-white/10 border border-sky-200 dark:border-white/10 rounded-full px-3 py-1 text-[11px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Eshitish</button>
       </div>
       <div class="p-4">
         <h4 class="font-bold text-[14px]">${escapeHTML(p1.title)} — ${escapeHTML(p1.questions[0].q)}</h4>
         <p class="text-[13px] leading-6 mt-2 text-slate-600 dark:text-slate-300">${escapeHTML(p1.questions[0].a.slice(0,180))}...</p>
-        <div class="mt-3 flex gap-2">
+        <div class="mt-3 flex flex-wrap gap-2">
           <button onclick="openTopic('${p1.id}')" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-1.5 text-[12px] font-bold">Mavzuni ochish</button>
-          <button onclick="speak('${p1.questions[1].q}', voicePref)" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[12px] font-bold">2-savolni eshitish</button>
+          <button onclick="playDailyAudio('p1',1)" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[12px] font-bold">2-savolni eshitish</button>
         </div>
       </div>
     </div>
     <div class="rounded-2xl border-2 border-amber-300 dark:border-amber-500/30 overflow-hidden">
-      <div class="bg-amber-400 px-4 py-2 flex items-center justify-between">
+      <div class="bg-amber-400 px-4 py-2 flex flex-wrap items-center justify-between gap-2">
         <span class="text-[11px] font-extrabold tracking-wide text-slate-900">PART 2 • 8 min — CUE CARD</span>
-        <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full">1 min prep + 2 min talk</span>
+        <span class="text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded-full whitespace-nowrap">1 min prep + 2 min talk</span>
       </div>
       <div class="p-4 bg-amber-50/50 dark:bg-amber-500/5">
         <h4 class="font-serif text-[15px] leading-tight">${escapeHTML(p2.title)}</h4>
         <ul class="mt-2 space-y-1">
           ${p2.prompts.map(pr=>`<li class="text-[12px] flex gap-2"><span class="text-amber-600">•</span>${escapeHTML(pr)}</li>`).join('')}
         </ul>
-        <div class="mt-3 flex gap-2">
-          <button onclick="speak('${p2.title}. ${p2.prompts.join('. ')}', voicePref)" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-1.5 text-[12px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Cue cardni eshitish</button>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button onclick="playDailyAudio('p2',0)" class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full px-4 py-1.5 text-[12px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Cue cardni eshitish</button>
           <button onclick="openTopic('${p2.id}')" class="bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-full px-3 py-1.5 text-[12px] font-bold">Namuna javob</button>
         </div>
       </div>
     </div>
     <div class="rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
-      <div class="bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2 flex items-center justify-between">
-        <span class="text-[11px] font-extrabold tracking-wide text-emerald-700 dark:text-emerald-300">PART 3 • 6 min</span>
-        <button onclick="speak('${p3.questions[0].q}', voicePref)" class="bg-white dark:bg-white/10 border border-emerald-200 dark:border-white/10 rounded-full px-3 py-1 text-[11px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Eshitish</button>
+      <div class="bg-amber-50 dark:bg-amber-500/10 px-4 py-2 flex items-center justify-between gap-2">
+        <span class="text-[11px] font-extrabold tracking-wide text-amber-700 dark:text-amber-300">PART 3 • 6 min</span>
+        <button onclick="playDailyAudio('p3',0)" class="bg-white dark:bg-white/10 border border-amber-200 dark:border-white/10 rounded-full px-3 py-1 text-[11px] font-bold inline-flex items-center gap-1"><i data-lucide="volume-2" class="w-3 h-3"></i> Eshitish</button>
       </div>
       <div class="p-4">
         <h4 class="font-bold text-[14px]">${escapeHTML(p3.questions[0].q)}</h4>
@@ -1287,6 +1326,7 @@ window.setPreviewTab=setPreviewTab; window.previewMore=previewMore; window.rende
 window.closeTopic=closeTopic; window.playQuestionAudio=playQuestionAudio; window.toggleRecForQuestion=toggleRecForQuestion;
 window.startRecordingForTopic=startRecordingForTopic; window.addToDailyFromModal=addToDailyFromModal;
 window.setVoice=setVoice; window.setRate=setRate; window.previewVoice=previewVoice; window.switchModalVoice=switchModalVoice;
+window.playDailyAudio=playDailyAudio; window.playModalCueCard=playModalCueCard; window.playModalBestAnswer=playModalBestAnswer;
 window.saveSettings=saveSettings; window.openSettings=openSettings; window.closeSettings=closeSettings;
 window.toggleMobileMenu=toggleMobileMenu; window.filterPart2=filterPart2; window.speak=speak; window.stopSpeak=stopSpeak;
 window.playHeroAudio=playHeroAudio; window.startMock=startMock; window.stopMock=stopMock; window.nextMockQuestion=nextMockQuestion;
