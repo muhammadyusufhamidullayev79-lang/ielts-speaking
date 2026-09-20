@@ -5,7 +5,7 @@
  *   - Navigatsiya: avval tarmoq, uzilsa cache'dagi index.html.
  */
 
-const VERSION = 'v1.1.0';
+const VERSION = 'v1.1.1';
 const SHELL_CACHE = `ielts-shell-${VERSION}`;
 const RUNTIME_CACHE = `ielts-runtime-${VERSION}`;
 const KEEP = new Set([SHELL_CACHE, RUNTIME_CACHE]);

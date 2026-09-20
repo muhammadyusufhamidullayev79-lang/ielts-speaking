@@ -190,8 +190,6 @@
   function setOnline(online) {
     window.IELTS_PWA.online = online;
     document.documentElement.classList.toggle('is-offline', !online);
-    const bar = document.getElementById('offlineBar');
-    if (bar) bar.hidden = online;
     document.querySelectorAll('[data-needs-online]').forEach((el) => {
       el.classList.toggle('needs-online-locked', !online);
       if (el.tagName === 'BUTTON') el.disabled = !online;
