@@ -112,26 +112,26 @@ html.dark { color-scheme: dark; }
         <a href="#" class="flex items-center gap-3" onclick="router('home');return false">
           <img src="assets/icons/logo-128.png" alt="IELTS Eagle 9 Logo" width="40" height="40" class="w-10 h-10 rounded-full object-cover shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
           <div class="leading-none">
-            <div class="font-extrabold tracking-tight text-[15px] flex items-center gap-1.5">IELTS SPEAKING <span class="hidden sm:inline text-[10px] bg-[#0A4FA8] text-white px-1.5 py-0.5 rounded-full tracking-widest">EAGLE 9</span></div>
+            <div class="font-extrabold tracking-tight text-[15px] flex items-center gap-1.5">IELTS SPEAKING <span class="hidden xl:inline text-[10px] bg-[#0A4FA8] text-white px-1.5 py-0.5 rounded-full tracking-widest">EAGLE 9</span></div>
             <div class="text-[10px] tracking-[0.18em] font-bold text-slate-500 dark:text-slate-400 -mt-0.5">PRO • UZBEKISTAN</div>
           </div>
-          <span class="hidden sm:inline-flex ml-2 px-2.5 py-1 rounded-full bg-[#0A4FA8] text-white text-[11px] font-extrabold tracking-wide">NEW 2026</span>
+          <span class="hidden 2xl:inline-flex ml-2 px-2.5 py-1 rounded-full bg-[#0A4FA8] text-white text-[11px] font-extrabold tracking-wide">NEW 2026</span>
         </a>
         <nav class="hidden lg:flex items-center gap-1 ml-2">
           <button onclick="router('part1')" data-nav="part1" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">Part 1 <span id="navCountP1" class="ml-1 text-[11px] bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-1.5 py-0.5 rounded-full">38</span></button>
           <button onclick="router('part2')" data-nav="part2" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">Part 2 <span id="navCountP2" class="ml-1 text-[11px] bg-amber-400 text-slate-900 px-1.5 py-0.5 rounded-full">80</span></button>
-          <button onclick="router('part3')" data-nav="part3" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">Part 3 <span id="navCountP3" class="ml-1 text-[11px] bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-1.5 py-0.5 rounded-full">42</span></button>
+          <button onclick="router('part3')" data-nav="part3" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">Part 3 <span id="navCountP3" class="ml-1 text-[11px] bg-amber-400 text-slate-900 px-1.5 py-0.5 rounded-full">42</span></button>
           <button onclick="router('mock')" data-nav="mock" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>Mock</button>
           <button onclick="router('daily')" data-nav="daily" class="nav-btn px-3.5 py-2 rounded-full text-[13px] font-semibold hover:bg-slate-100 dark:hover:bg-white/10">20' Daily</button>
         </nav>
       </div>
       <div class="flex items-center gap-2 sm:gap-3">
-        <div class="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-white/10 rounded-full pl-3 pr-1 py-1 border border-slate-200 dark:border-white/10">
+        <div class="hidden md:flex lg:hidden xl:flex items-center gap-2 bg-slate-100 dark:bg-white/10 rounded-full pl-3 pr-1 py-1 border border-slate-200 dark:border-white/10">
           <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
-          <input id="globalSearch" placeholder="Mavzu qidirish — masalan, hometown, music..." maxlength="80" autocomplete="off" spellcheck="false" inputmode="search" class="bg-transparent outline-none text-[13px] w-[260px] placeholder:text-slate-400">
+          <input id="globalSearch" placeholder="Mavzu qidirish — masalan, hometown, music..." maxlength="80" autocomplete="off" spellcheck="false" inputmode="search" class="bg-transparent outline-none text-[13px] w-[200px] min-w-0 xl:w-[260px] placeholder:text-slate-400">
           <button onclick="doGlobalSearch()" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full w-7 h-7 grid place-items-center"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
         </div>
-        <button type="button" data-pwa-install onclick="pwaInstall()" class="pwa-install-btn hidden sm:inline-flex" hidden>
+        <button type="button" data-pwa-install onclick="pwaInstall()" class="pwa-install-btn hidden lg:inline-flex" hidden>
           <i data-lucide="download" class="w-4 h-4"></i> Ilovani o'rnatish
         </button>
         <div id="accountControls" class="account-controls">
@@ -146,7 +146,7 @@ html.dark { color-scheme: dark; }
         <button onclick="openSettings()" class="w-9 h-9 rounded-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 grid place-items-center">
           <i data-lucide="settings-2" class="w-4 h-4"></i>
         </button>
-        <button class="hidden sm:inline-flex items-center gap-2 bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-2 text-[13px] font-bold">
+        <button class="hidden 2xl:inline-flex items-center gap-2 bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full px-4 py-2 text-[13px] font-bold">
           <span class="w-6 h-6 rounded-full bg-amber-400 grid place-items-center text-[#0F172A] text-[11px] font-extrabold">Y</span> Yusuf
         </button>
         <button class="lg:hidden p-2" onclick="toggleMobileMenu()"><i data-lucide="menu" class="w-5 h-5"></i></button>
@@ -156,9 +156,9 @@ html.dark { color-scheme: dark; }
       <div class="flex gap-2 overflow-auto pb-2">
         <button onclick="router('part1')" class="px-4 py-2 rounded-full bg-slate-900 text-white text-sm whitespace-nowrap">Part 1 • <span id="mNavCountP1">38</span></button>
         <button onclick="router('part2')" class="px-4 py-2 rounded-full bg-amber-400 text-slate-900 text-sm whitespace-nowrap">Part 2 • <span id="mNavCountP2">80</span></button>
-        <button onclick="router('part3')" class="px-4 py-2 rounded-full bg-white border text-sm whitespace-nowrap">Part 3 • <span id="mNavCountP3">42</span></button>
+        <button onclick="router('part3')" class="px-4 py-2 rounded-full bg-amber-500 text-white text-sm whitespace-nowrap">Part 3 • <span id="mNavCountP3">42</span></button>
         <button onclick="router('mock')" class="px-4 py-2 rounded-full bg-red-500 text-white text-sm whitespace-nowrap">Mock</button>
-        <button onclick="router('daily')" class="px-4 py-2 rounded-full bg-white border text-sm whitespace-nowrap">20' Daily</button>
+        <button onclick="router('daily')" class="px-4 py-2 rounded-full bg-emerald-500 text-white text-sm whitespace-nowrap">20' Daily</button>
       </div>
       <div class="flex items-center gap-2 bg-slate-100 dark:bg-white/10 rounded-2xl px-3 py-2">
         <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
@@ -801,7 +801,7 @@ html.dark { color-scheme: dark; }
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500">
       <div class="flex items-center gap-3">
         <img src="assets/icons/logo-128.png" alt="logo" width="32" height="32" class="w-8 h-8 rounded-full object-cover">
-        <span>© 2026 IELTS Speaking Pro — <b class="text-[#0A4FA8] dark:text-white">Eagle 9</b> • Barcha mavzular IELTS 2026 formatiga mos. Made for Uzbekistan 🇺🇿 <span class="ml-1 font-mono text-[11px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full">build v2.1</span></span>
+        <span>© 2026 IELTS Speaking Pro — <b class="text-[#0A4FA8] dark:text-white">Eagle 9</b> • Barcha mavzular IELTS 2026 formatiga mos. Made for Uzbekistan 🇺🇿 <span class="ml-1 font-mono text-[11px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full">build v2.2</span></span>
       </div>
       <div class="flex gap-4"><a href="#" class="hover:underline" rel="noopener">Maxfiylik</a><a href="#" class="hover:underline" rel="noopener">Yordam</a><a href="#" class="hover:underline" rel="noopener">Aloqa</a><a href="admin.html" class="hover:underline font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-2.5 py-1 rounded-full text-[11px]">Admin</a></div>
     </div>

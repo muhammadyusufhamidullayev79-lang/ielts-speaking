@@ -131,12 +131,39 @@
     toast('Ilova o\u2019rnatildi. Endi uni telefoningizdan ochishingiz mumkin.');
   });
 
+  /* Bosilganda: darhol brauzerning o'z o'rnatish oynasini chiqaramiz (avto-o'rnatish).
+   * Agar prompt hali tayyor bo'lmasa (service worker hali o'rnatilmoqda) — qisqa kutamiz:
+   * tayyor bo'lgach oynani O'ZIMIZ ochamiz, foydalanuvchi qayta bosishi shart emas.
+   * iOS'da brauzer bunday imkonni bermaydi — qo'lda qo'llanma ko'rsatamiz. */
+  let waitingForInstallPrompt = false;
   window.pwaInstall = async function pwaInstall() {
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      try { await deferredPrompt.userChoice; } catch (e) { /* ignore */ }
+      const promptEvent = deferredPrompt;
       deferredPrompt = null;
+      try { promptEvent.prompt(); } catch (e) { openInstallHelp(); return; }
+      try { await promptEvent.userChoice; } catch (e) { /* ignore */ }
       showInstallUI(false);
+      return;
+    }
+    if (IS_IOS) { openInstallHelp(); return; }
+    // Chrome/Edge: prompt bir-ikki soniyada tayyor bo'ladi — kutasiz va o'zi ochiladi.
+    if ('serviceWorker' in navigator && !waitingForInstallPrompt) {
+      waitingForInstallPrompt = true;
+      toast('Ilova tayyorlanmoqda — o\u2019rnatish oynasi birozdan o\u2019zi ochiladi\u2026', { duration: 9000 });
+      let timer = null;
+      const cleanup = () => {
+        waitingForInstallPrompt = false;
+        window.removeEventListener('beforeinstallprompt', onReady);
+        if (timer) clearTimeout(timer);
+      };
+      const onReady = (e) => {
+        e.preventDefault();
+        cleanup();
+        deferredPrompt = e;
+        window.pwaInstall(); // endi native o'rnatish oynasi o'zi ochiladi
+      };
+      timer = setTimeout(() => { cleanup(); if (!deferredPrompt) openInstallHelp(); }, 12000);
+      window.addEventListener('beforeinstallprompt', onReady);
       return;
     }
     openInstallHelp();
