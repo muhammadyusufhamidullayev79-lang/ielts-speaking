@@ -1,0 +1,23 @@
+/* Account UI only: inherit the existing typography and slate/dark palette. */
+.account-controls{display:flex;align-items:center;gap:4px;min-width:0}
+.account-button{border:1px solid #e2e8f0;border-radius:999px;background:#fff;color:inherit;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;line-height:1.4}
+.dark .account-button{background:rgb(255 255 255 / .1);border-color:rgb(255 255 255 / .1)}
+.account-button:hover{background:#f1f5f9}.dark .account-button:hover{background:rgb(255 255 255 / .15)}
+.account-button:disabled{opacity:.5;cursor:wait}
+#accountButton{max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.account-notice{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.account-overlay{position:fixed;inset:0;z-index:100;background:rgb(15 23 42 / .6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px}
+.account-overlay[hidden],.account-overlay [hidden],.account-controls [hidden]{display:none!important}
+.account-dialog{background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:24px;width:100%;max-width:440px;max-height:90dvh;overflow:auto;box-shadow:0 25px 50px -12px rgb(0 0 0 / .25);font-size:13px}
+.dark .account-dialog{background:#111A33;border-color:rgb(255 255 255 / .1)}
+.account-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.account-heading h2{font-size:20px;font-weight:800}
+#accountStatus{margin:16px 0;color:#64748b;line-height:1.6}.dark #accountStatus{color:#94a3b8}
+#authForm label{display:block;font-size:12px;font-weight:700;margin:12px 0}
+#authForm input{display:block;width:100%;margin-top:6px;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc;font:inherit}
+.dark #authForm input{background:rgb(255 255 255 / .05);border-color:rgb(255 255 255 / .1)}
+.account-button:focus-visible,#authForm input:focus-visible{outline:2px solid #94a3b8;outline-offset:2px}
+.account-primary{width:100%;background:#0F172A;color:#fff;margin-top:8px}.dark .account-primary{background:#fff;color:#0F172A}
+.account-primary:hover{background:#334155}.dark .account-primary:hover{background:#f1f5f9}
+.account-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+#accountEmail{overflow-wrap:anywhere;margin-bottom:16px}#accountHistory{margin-top:16px}#accountHistory p{padding:8px 0;border-bottom:1px solid #e2e8f0;overflow-wrap:anywhere}.dark #accountHistory p{border-color:rgb(255 255 255 / .1)}
+@media(max-width:639px){#accountButton{max-width:92px;padding:6px 8px;font-size:13px}#logoutButton{padding:6px 8px}.account-controls{gap:2px}.account-dialog{padding:20px}}

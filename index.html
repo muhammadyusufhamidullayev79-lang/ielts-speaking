@@ -2,17 +2,33 @@
 <html lang="uz" class="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta http-equiv="Permissions-Policy" content="microphone=(self), camera=(), geolocation=()">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://unpkg.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; media-src 'self' blob: data: https:; connect-src 'self' https: data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https: blob:; media-src 'self' blob: data: https:; connect-src 'self' https: data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'">
 <title>IELTS Speaking Pro — 9.0 sari professional tayyorgarlik</title>
-<link rel="icon" type="image/png" href="assets/logo.png">
-<link rel="apple-touch-icon" href="assets/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<meta name="description" content="IELTS Speaking Part 1/2/3 mavzular banki, Band 8-9 namunalari, AI ovoz, Mock Speaking va 20' Daily dars. Mavzular internetsiz ham ishlaydi.">
+
+<!-- PWA / ilova -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2E0E4E" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F0A1E" media="(prefers-color-scheme: dark)">
+<meta name="application-name" content="IELTS Speaking Pro">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IELTS Speaking">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="167x167" href="assets/icons/apple-touch-icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="assets/icons/apple-touch-icon-152.png">
+
+<!-- Shriftlar loyiha ichida: internetsiz ham to'g'ri ko'rinadi -->
+<link rel="stylesheet" href="assets/fonts/fonts.css">
 <link rel="stylesheet" href="css/app.css">
 <style>
 :root { color-scheme: light; }
@@ -77,17 +93,24 @@ html.dark { color-scheme: dark; }
 .account-btn-avatar{width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none}
 .account-btn-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:639px){.account-dialog{padding:22px}.account-stats{grid-template-columns:repeat(2,1fr)}.account-avatar{width:64px;height:64px}.account-avatar-img,.account-avatar-initial{width:64px;height:64px;font-size:24px}#accountButton{max-width:118px}}
+
 </style>
-<script src="https://unpkg.com/lucide@latest" defer crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="vendor/lucide.min.js" defer></script>
+<script src="js/pwa.js" defer></script>
 </head>
 <body class="bg-[#F5F0FF] dark:bg-[#0F0A1E] text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-amber-200">
+<!-- OFLAYN HOLAT CHIZIG'I -->
+<div id="offlineBar" class="offline-bar" role="status" aria-live="polite" hidden>
+  <span class="offline-dot"></span>
+  <span>Internet yo‘q — <b>mavzular va Best Answer’lar</b> ishlayapti. Mock va bulutga saqlash ulanish tiklangach.</span>
+</div>
 <!-- TOP NAV -->
 <header class="sticky top-0 z-40 bg-white/80 dark:bg-[#0F0A1E]/80 glass border-b border-slate-200 dark:border-white/10">
   <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
     <div class="h-[64px] flex items-center justify-between gap-4">
       <div class="flex items-center gap-6">
         <a href="#" class="flex items-center gap-3" onclick="router('home');return false">
-          <img src="assets/logo.png" alt="IELTS Eagle 9 Logo" class="w-10 h-10 rounded-full object-cover shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
+          <img src="assets/icons/logo-128.png" alt="IELTS Eagle 9 Logo" width="40" height="40" class="w-10 h-10 rounded-full object-cover shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
           <div class="leading-none">
             <div class="font-extrabold tracking-tight text-[15px] flex items-center gap-1.5">IELTS SPEAKING <span class="hidden sm:inline text-[10px] bg-[#2E0E4E] text-white px-1.5 py-0.5 rounded-full tracking-widest">EAGLE 9</span></div>
             <div class="text-[10px] tracking-[0.18em] font-bold text-slate-500 dark:text-slate-400 -mt-0.5">PRO • UZBEKISTAN</div>
@@ -108,6 +131,9 @@ html.dark { color-scheme: dark; }
           <input id="globalSearch" placeholder="Mavzu qidirish — masalan, hometown, music..." maxlength="80" autocomplete="off" spellcheck="false" inputmode="search" class="bg-transparent outline-none text-[13px] w-[260px] placeholder:text-slate-400">
           <button onclick="doGlobalSearch()" class="bg-[#0F172A] dark:bg-white text-white dark:text-[#0F172A] rounded-full w-7 h-7 grid place-items-center"><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
         </div>
+        <button type="button" data-pwa-install onclick="pwaInstall()" class="pwa-install-btn hidden sm:inline-flex" hidden>
+          <i data-lucide="download" class="w-4 h-4"></i> Ilovani o'rnatish
+        </button>
         <div id="accountControls" class="account-controls">
           <button id="accountButton" onclick="openAuth()" class="account-button">Kirish / Ro'yxatdan o'tish</button>
           <button id="logoutButton" onclick="logoutAccount()" class="account-button" hidden>Chiqish</button>
@@ -139,6 +165,9 @@ html.dark { color-scheme: dark; }
         <input id="globalSearchM" placeholder="Mavzu qidirish..." maxlength="80" autocomplete="off" spellcheck="false" inputmode="search" class="bg-transparent outline-none text-sm flex-1">
         <button onclick="document.getElementById('globalSearch').value=document.getElementById('globalSearchM').value;doGlobalSearch()" class="bg-slate-900 text-white rounded-full px-3 py-1 text-sm">Qidirish</button>
       </div>
+      <button type="button" data-pwa-install onclick="pwaInstall()" class="pwa-install-btn w-full justify-center" hidden>
+        <i data-lucide="download" class="w-4 h-4"></i> Ilovani telefonga o'rnatish
+      </button>
     </div>
   </div>
 </header>
@@ -201,7 +230,7 @@ html.dark { color-scheme: dark; }
               <p class="text-[13px] text-slate-500 mt-1">Part 2 • Cue Card #01 • 2 minutes</p>
               <div class="mt-4 bg-slate-50 dark:bg-white/5 rounded-2xl p-4 border border-slate-200 dark:border-white/10">
                 <div class="flex items-center gap-3">
-                  <img id="heroVoiceAvatar" loading="lazy" src="https://i.pravatar.cc/100?img=5" loading="lazy" decoding="async" class="w-9 h-9 rounded-full object-cover">
+                  <img id="heroVoiceAvatar" src="assets/avatars/dilnoza.svg" loading="lazy" decoding="async" class="w-9 h-9 rounded-full object-cover">
                   <div class="flex-1">
                     <div class="text-[13px] font-bold flex items-center gap-2"><span id="heroVoiceName">Dilnoza • Qiz bola</span> <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span></div>
                     <div class="text-[11px] text-slate-500">AI ovozida savolni eshitish</div>
@@ -231,9 +260,9 @@ html.dark { color-scheme: dark; }
             </div>
             <div class="px-6 py-4 bg-slate-50 dark:bg-white/5 border-t border-slate-200 dark:border-white/10 flex items-center justify-between">
               <div class="flex -space-x-2">
-                <img src="https://i.pravatar.cc/100?img=12" loading="lazy" decoding="async" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
-                <img src="https://i.pravatar.cc/100?img=32" loading="lazy" decoding="async" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
-                <img src="https://i.pravatar.cc/100?img=15" loading="lazy" decoding="async" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
+                <img src="assets/avatars/student-1.svg" loading="lazy" decoding="async" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
+                <img src="assets/avatars/student-2.svg" loading="lazy" decoding="async" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
+                <img src="assets/avatars/student-3.svg" loading="lazy" decoding="async" class="w-7 h-7 rounded-full border-2 border-white dark:border-[#111A33]">
                 <div class="w-7 h-7 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 grid place-items-center text-[10px] font-bold border-2 border-white">+2k</div>
               </div>
               <div class="text-[12px] font-medium text-slate-600 dark:text-slate-300">2,847 o'quvchi bugun mashq qildi</div>
@@ -392,8 +421,12 @@ html.dark { color-scheme: dark; }
           <h1 class="mt-4 font-serif text-[32px] sm:text-[40px] leading-[0.95]">Haqiqiy imtihon <br><span class="italic font-light">kabi</span> <span class="bg-amber-400 text-slate-900 px-2 rounded-xl">Mock</span></h1>
           <p class="mt-3 text-[14px] leading-6 text-white/80 max-w-[560px]">Savollar audio tizimda o'qiladi, siz mikrofonda javob berasiz. Nutqingiz <b>speech-to-text</b> orqali matnga aylanadi va so'z boyligi, bog'lovchilar, pauzalar hamda ovoz sifati bo'yicha tahlil qilinadi.</p>
           <div class="mt-6 flex flex-wrap gap-3">
-            <button onclick="startMock()" class="bg-amber-400 text-slate-900 rounded-full px-7 py-3 font-extrabold text-[14px] inline-flex items-center gap-2">Mock ni boshlash <i data-lucide="mic" class="w-4 h-4"></i></button>
+            <button onclick="startMock()" data-needs-online class="bg-amber-400 text-slate-900 rounded-full px-7 py-3 font-extrabold text-[14px] inline-flex items-center gap-2">Mock ni boshlash <i data-lucide="mic" class="w-4 h-4"></i></button>
             <button onclick="openSettings()" class="bg-white/10 backdrop-blur border border-white/20 rounded-full px-6 py-3 font-bold text-[14px] inline-flex items-center gap-2"><i data-lucide="settings-2" class="w-4 h-4"></i> Ovozni tanlash</button>
+          </div>
+          <div class="offline-note" data-offline-note hidden>
+            <i data-lucide="wifi-off" class="w-4 h-4 mt-0.5 flex-none"></i>
+            <span>Mock topshirish uchun internet kerak — natijalar bulutga saqlanadi. Hozircha <b>Part 1 / Part 2 / Part 3</b> mavzularini oflayn mashq qilishingiz mumkin.</span>
           </div>
           <div class="mt-6 flex gap-6 text-[12px]">
             <div><div class="font-mono text-[20px] font-bold" id="mockStatsTotal">400</div><div class="opacity-70">savollar banki</div></div>
@@ -722,7 +755,7 @@ html.dark { color-scheme: dark; }
           <div class="mt-3 grid gap-3">
             <label class="flex items-center gap-3 bg-white dark:bg-[#111A33] border-2 rounded-2xl p-3 cursor-pointer has-[:checked]:border-slate-900 dark:has-[:checked]:border-white">
               <input type="radio" name="voice" value="female" checked onchange="setVoice('female')" class="accent-slate-900">
-              <img src="https://i.pravatar.cc/100?img=5" loading="lazy" decoding="async" class="w-10 h-10 rounded-full">
+              <img src="assets/avatars/dilnoza.svg" loading="lazy" decoding="async" class="w-10 h-10 rounded-full">
               <div class="flex-1">
                 <div class="text-[13px] font-extrabold">Dilnoza — Qiz bola</div>
                 <div class="text-[11px] text-slate-500">Yoqimli, ravon, British accent • Tezligi sozlanadi</div>
@@ -731,7 +764,7 @@ html.dark { color-scheme: dark; }
             </label>
             <label class="flex items-center gap-3 bg-white dark:bg-[#111A33] border-2 rounded-2xl p-3 cursor-pointer has-[:checked]:border-slate-900 dark:has-[:checked]:border-white">
               <input type="radio" name="voice" value="male" onchange="setVoice('male')" class="accent-slate-900">
-              <img src="https://i.pravatar.cc/100?img=12" loading="lazy" decoding="async" class="w-10 h-10 rounded-full">
+              <img src="assets/avatars/jasur.svg" loading="lazy" decoding="async" class="w-10 h-10 rounded-full">
               <div class="flex-1">
                 <div class="text-[13px] font-extrabold">Jasur — O'g'il bola</div>
                 <div class="text-[11px] text-slate-500">Ishonchli, tiniq, American accent</div>
@@ -767,7 +800,7 @@ html.dark { color-scheme: dark; }
   <div class="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-slate-500">
       <div class="flex items-center gap-3">
-        <img src="assets/logo.png" alt="logo" class="w-8 h-8 rounded-full object-cover">
+        <img src="assets/icons/logo-128.png" alt="logo" width="32" height="32" class="w-8 h-8 rounded-full object-cover">
         <span>© 2026 IELTS Speaking Pro — <b class="text-[#2E0E4E] dark:text-white">Eagle 9</b> • Barcha mavzular IELTS 2026 formatiga mos. Made for Uzbekistan 🇺🇿 <span class="ml-1 font-mono text-[11px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full">build v2.1</span></span>
       </div>
       <div class="flex gap-4"><a href="#" class="hover:underline" rel="noopener">Maxfiylik</a><a href="#" class="hover:underline" rel="noopener">Yordam</a><a href="#" class="hover:underline" rel="noopener">Aloqa</a><a href="admin.html" class="hover:underline font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-2.5 py-1 rounded-full text-[11px]">Admin</a></div>
@@ -854,6 +887,46 @@ window.FIREBASE_CONFIG = {
       </div>
       <p class="account-hint">Mock natijalari va Daily vazifalari akkauntingizga (bulutga) avtomatik saqlanadi — boshqa qurilmadan ham ko'rinadi.</p>
     </div>
+  </section>
+</div>
+<!-- ILOVANI O'RNATISH QO'LLANMASI -->
+<div id="pwaInstallHelp" class="pwa-help-overlay" hidden>
+  <section class="pwa-help-card" role="dialog" aria-modal="true" aria-labelledby="pwaHelpTitle" tabindex="-1">
+    <div class="pwa-help-head">
+      <h2 id="pwaHelpTitle">Ilovani o'rnatish</h2>
+      <button type="button" class="account-x" onclick="closeInstallHelp()" aria-label="Yopish">✕</button>
+    </div>
+    <p class="pwa-help-sub">Bir marta o'rnatsangiz, ilova telefoningiz ekranidan alohida dastur kabi ochiladi
+      va mavzular internetsiz ham ishlaydi.</p>
+
+    <div class="pwa-help-block">
+      <h3><span class="pwa-help-badge">iPhone / iPad</span> Safari</h3>
+      <ol>
+        <li>Pastdagi <b>Ulashish</b> (⬆️) tugmasini bosing</li>
+        <li>Ro'yxatdan <b>“Add to Home Screen”</b> ni tanlang</li>
+        <li>O'ng yuqoridagi <b>“Add”</b> ni bosing</li>
+      </ol>
+    </div>
+
+    <div class="pwa-help-block">
+      <h3><span class="pwa-help-badge">Android</span> Chrome</h3>
+      <ol>
+        <li>O'ng yuqoridagi <b>⋮</b> menyusini oching</li>
+        <li><b>“Install app”</b> yoki <b>“Add to Home screen”</b> ni tanlang</li>
+        <li><b>“Install”</b> ni tasdiqlang</li>
+      </ol>
+    </div>
+
+    <div class="pwa-help-block">
+      <h3><span class="pwa-help-badge">Noutbuk</span> Chrome / Edge</h3>
+      <ol>
+        <li>Manzil satrining o'ng chetidagi <b>o'rnatish</b> (⊕) belgisini bosing</li>
+        <li><b>“Install”</b> ni tasdiqlang</li>
+      </ol>
+    </div>
+
+    <p class="pwa-help-note">Eslatma: Mock Speaking va bulutga saqlash internet talab qiladi.
+      Part 1 / Part 2 / Part 3 mavzulari, Best Answer'lar va 20' Daily dars oflayn ishlaydi.</p>
   </section>
 </div>
 <script src="js/data.js" defer></script>

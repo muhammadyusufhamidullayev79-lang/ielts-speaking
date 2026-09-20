@@ -1,29 +1,99 @@
 # IELTS Speaking Pro — Eagle 9 (Uzbekistan)
 
-IELTS Speaking uchun tayyorgarlik sayti: Part 1 / Part 2 / Part 3 mavzular banki,
+IELTS Speaking uchun tayyorgarlik platformasi: Part 1 / Part 2 / Part 3 mavzular banki,
 Best Answer (Band 8-9) namunalari, audio (AI ovoz), Mock Speaking va 20' Daily dars.
+
+**Uchta ko'rinishda ishlaydi:**
+
+| Ko'rinish | Kim uchun | Qanday |
+| --- | --- | --- |
+| **Sayt** | Noutbuk / kompyuter | Vercel'ga deploy qilinadi, brauzerda ochiladi |
+| **PWA ilova** | Telefon va noutbuk | Saytdan "Ilovani o'rnatish" — alohida dastur kabi ochiladi, mavzular oflayn ishlaydi |
+| **Android / iOS** | Play Store, App Store | Capacitor qobig'i (`android/`, `ios/`) |
+
+### Oflayn qoidasi
+
+- **Oflayn ishlaydi:** Part 1 / Part 2 / Part 3 mavzulari, Best Answer'lar, cue card'lar,
+  20' Daily dars, AI ovoz (qurilma o'zining nutq sintezi), mavzu ichidagi yozib olish.
+- **Internet talab qiladi:** Mock Speaking (natijalar bulutga yoziladi), akkauntga kirish,
+  progressni qurilmalar o'rtasida sinxronlash.
+
+Internet uzilsa sahifa tepasida sariq chiziq chiqadi, Mock tugmasi vaqtincha o'chadi,
+mavzular esa odatdagidek ochilaveradi.
 
 ## Fayllar
 
 | Fayl | Vazifasi |
 | --- | --- |
 | `index.html` | Asosiy sahifa (Vercel'ga shu chiqadi) |
-| `standalone.html` | Hammasi bitta faylda (CSS + JS ichida) — offline/ulashish uchun |
+| `manifest.webmanifest` | PWA manifesti — ilova nomi, ikonkalar, shortcut'lar |
+| `sw.js` | Service worker — oflayn cache (Firebase hech qachon cache'lanmaydi) |
+| `offline.html` | Ilova hali yuklanmaganda ko'rsatiladigan zaxira sahifa |
+| `js/pwa.js` | O'rnatish tugmasi, oflayn holat, yangilanish, Capacitor integratsiyasi |
 | `js/data.js` | Savollar banki (Part 1: 38 mavzu, Part 2: 80 cue card, Part 3: 42 mavzu) |
 | `js/app.js` | Sayt logikasi: qidiruv, modal, audio, mock, daily |
-| `css/app.css` | Tailwind CSS (build qilinadi) |
+| `css/app.css` | Build natijasi — **qo'lda tahrirlamang** (`tools/build-css.sh` yaratadi) |
+| `css/account.css`, `css/pwa.css` | Qo'lda yoziladigan stillar (build vaqtida app.css ga qo'shiladi) |
+| `vendor/`, `assets/fonts/` | Lucide ikonkalari va shriftlar — oflayn uchun loyiha ichida |
+| `assets/icons/` | PWA / Android / iOS ikonkalari (`tools/build-icons.mjs` yaratadi) |
+| `standalone.html` | Hammasi bitta faylda — ulashish uchun (`tools/build-standalone.py`) |
 | `admin.html`, `js/admin.js` | Admin panel (mavzu qo'shish/tahrirlash, import/export) |
-| `tools/build-standalone.py` | `standalone.html` ni qayta yig'adi |
+| `capacitor.config.json` | Android/iOS qobig'i sozlamalari |
+| `android/`, `ios/` | Native loyihalar (Android Studio / Xcode bilan ochiladi) |
 
 ## Build
 
 ```bash
-# 1) Tailwind CSS ni yangilash (yangi class qo'shsangiz)
-npx tailwindcss -i input.css -o css/app.css --minify
+npm install          # bir marta
 
-# 2) standalone.html ni qayta yig'ish
-python3 tools/build-standalone.py
+npm run build:css    # css/app.css (Tailwind + account.css + pwa.css)
+npm run build:icons  # assets/icons/ — logodan PWA ikonkalari
+npm run test         # testlar
+npm run serve        # http://localhost:8000
 ```
+
+`index.html`, `js/*.js` yoki CSS'ni o'zgartirsangiz `npm run build:css` ni ishlating —
+`css/app.css` build natijasi, uni qo'lda tahrirlash bekor bo'ladi.
+
+### Yangi versiyani chiqarish
+
+Service worker cache'ini yangilash uchun `sw.js` ichidagi `VERSION` ni oshiring
+(masalan `v1.0.0` → `v1.0.1`). Foydalanuvchilarga "yangi versiya tayyor" degan
+bildirishnoma chiqadi.
+
+## Android va iOS ilovalari
+
+Native loyihalar Capacitor bilan yig'ilgan. Veb kodi `www/` ga ko'chiriladi
+(bu papka git'ga kirmaydi, har safar qayta yaratiladi).
+
+```bash
+npm run build:app                      # www/ ni tayyorlaydi
+npx cap sync                           # www/ ni android/ va ios/ ga ko'chiradi
+node tools/build-native-assets.mjs     # ikonka va splash ekranlar
+
+npm run android                        # Android Studio'da ochadi
+npm run ios                            # Xcode'da ochadi (Mac kerak)
+```
+
+**Kerakli dasturlar:** Android uchun — Android Studio va JDK 17.
+iOS uchun — Mac, Xcode va CocoaPods (`sudo gem install cocoapods`, so'ng
+`cd ios/App && pod install`).
+
+### Play Store uchun
+
+1. Android Studio'da **Build → Generate Signed Bundle / APK → Android App Bundle**.
+2. Keystore yarating va **xavfsiz saqlang** — yo'qotsangiz ilovani yangilay olmaysiz.
+3. `android/app/build.gradle` da `versionCode` (butun son) va `versionName` ni oshiring.
+4. Hosil bo'lgan `.aab` faylni Play Console'ga yuklang.
+5. Play Console mikrofon ruxsati haqida so'raydi: Mock Speaking javoblarini yozib olish uchun.
+
+### App Store uchun
+
+1. Xcode'da **Signing & Capabilities** da o'z Apple Developer jamoangizni tanlang.
+2. `Product → Archive`, so'ng **Distribute App** orqali App Store Connect'ga yuboring.
+3. Apple Developer Program a'zoligi yiliga $99 turadi.
+
+Ilova identifikatori: `uz.eagle9.ieltsspeaking` (`capacitor.config.json` da).
 
 ## Asosiy funksiyalar
 
@@ -46,7 +116,8 @@ python3 tools/build-standalone.py
    yoki private key joylamang**.
 2. Authentication → Sign-in method → **Email/Password** ni yoqing.
    Settings → Authorized domains ga saytingiz domenini (test uchun preview domenini ham)
-   qo‘shing. Password reset xati shablonini Authentication → Templates’da sozlang.
+   qo‘shing. **Android/iOS ilovasi uchun** shu ro‘yxatga `localhost` ni ham qo‘shing —
+   Capacitor veb qismini `https://localhost` origin ostida ochadi. Password reset xati shablonini Authentication → Templates’da sozlang.
 3. Firestore Database yarating (production mode). `firestore.rules` ni Console → Rules
    orqali publish qiling yoki Firebase CLI bilan:
    `firebase deploy --only firestore:rules --project YOUR_PROJECT_ID`.
